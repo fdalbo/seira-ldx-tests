@@ -1,13 +1,13 @@
 "use strict";
 
-import os from 'os'
-import _ from 'lodash'
-import terminalUpdate from 'log-update'
-import chalk from 'chalk'
-import indentString from 'indent-string'
-import figures from 'figures'
-import { pause } from '#commons/promises'
-import myConsole from '#commons/myConsole'
+const os = require('os')
+const _ = require('lodash')
+const terminalUpdate = require('log-update')
+const chalk = require('chalk')
+const indentString = require('indent-string')
+const figures = require('figures')
+const { pause } = require('#commons/promises')
+const myConsole = require('#commons/myConsole')
 
 const _clearTerminal = (isSoft = true) => {
     if (os.platform() == 'win32') {
@@ -20,7 +20,7 @@ const _clearTerminal = (isSoft = true) => {
     }
 }
 
-export default class ControlPanel {
+module.exports = class ControlPanel {
     #intervalId = null
     #config = null
     #tasks = null

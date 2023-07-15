@@ -1,11 +1,11 @@
-import _ from 'lodash'
-import path from 'path'
-import elegantSpinner from 'elegant-spinner'
-import chalk from 'chalk'
-import indentString from 'indent-string'
-import figures from 'figures'
-import { expect as chaiExpect } from 'chai'
-import myConsole from '#commons/myConsole'
+const _ = require('lodash')
+const path = require('path')
+const elegantSpinner = require('elegant-spinner')
+const chalk = require('chalk')
+const indentString = require('indent-string')
+const figures = require('figures')
+const { expect: chaiExpect } = require('chai')
+const myConsole = require('#commons/myConsole')
 
 const STATUS = Object.freeze({
     WAITING: {
@@ -36,7 +36,7 @@ const STATUS = Object.freeze({
     }
 })
 
-export default class Task {
+module.exports = class Task {
     #title = null
     #spinner = elegantSpinner()
     #status = STATUS.WAITING

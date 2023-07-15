@@ -1,13 +1,13 @@
 'use strict';
 
-import path from 'path'
-import fs from 'fs'
-import _ from 'lodash'
-import winston from 'winston'
-import { checkParentPath } from './utils'
-import { rimraf } from 'rimraf'
-import { isMainThread, threadId } from 'worker_threads'
-import { getValues as envVarsGetValues } from '#env/defaultEnvVars'
+const path = require('path')
+const fs = require('fs')
+const _ = require('lodash')
+const winston = require('winston')
+const { checkParentPath } = require('./utils')
+const { rimraf } = require('rimraf')
+const { isMainThread, threadId } = require('worker_threads')
+const { getValues: envVarsGetValues } = require('#env/defaultEnvVars')
 
 const _myFormat = winston.format.printf(({ level, message, timestamp }) => {
     return `${timestamp} ${message}`
@@ -90,7 +90,7 @@ class Logger {
 
 }
 
-export default function createLogger(logFilePath, myConsole, opts) {
+module.exports = function (logFilePath, myConsole, opts) {
     const myLogger = new Logger(path.resolve(logFilePath), opts)
     myLogger.info(`INIT ${new Date().toDateString()}`)
     myLogger.info(`process.pid='${process.pid}' - process.ppid='${process.ppid}' - ${isMainThread ? 'main-thread' : `Worker-thread=${threadId}`}`)

@@ -21,8 +21,8 @@
         "import/no-unresolved": [
             2,
             {
-                "commonjs": false,
-                "amd": false
+                "commonjs": true,
+                "amd": true
             }
         ]
     }

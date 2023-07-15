@@ -4,14 +4,14 @@
  * Runs a script in a child process
  * Set the environment variables 
  */
-import fs from 'fs'
-import path from 'path'
-import { execaSync } from 'execa'
-import myConsole from '#commons/myConsole'
-import { pause } from '#commons/promises'
-import initEnvVars from '#env/initEnvVars'
-import appRootDir from 'app-root-dir'
-import os from 'os'
+const fs = require('fs')
+const path = require('path')
+const execa = require('execa')
+const myConsole = require('#commons/myConsole')
+const { pause } = require('#commons/promises')
+const initEnvVars = require('#env/initEnvVars')
+const appRootDir = require('app-root-dir')
+const os = require('os')
 
 /**
  * Node uncaughtException
@@ -22,50 +22,60 @@ process.on('uncaughtException', function (err) {
     setTimeout(() => process.exit(), 500)
 })
 
-export default async function (scriptRelativePath, additionalEnvVars, options) {
-    additionalEnvVars ??= []
+module.exports = async function (scriptRelativePath, additionalEnvVars, options) {
     try {
-        const scriptFullPath = path.resolve(appRootDir.get(), scriptRelativePath)
-
         myConsole.superhighlight(`RUNNER: BEGIN - Process: ${process.pid}`)
-
-        myConsole.lowlight(`Script file path\n- ${scriptFullPath}\nprocess.execPath:\n- ${process.execPath}`)
-
+        additionalEnvVars ??= []
         options = Object.assign({}, {
-            dotenvpath: null
+            dotenvpath: null,
+            /** 'node', 'artillery' */
+            command: null
         }, options ?? {})
-
-        if (!fs.existsSync(scriptFullPath)) {
-            throw new Error(`Script file found\n${scriptFullPath}`)
-        }
-
-        myConsole.highlight(`Init environment variables`)
         /** 
-         * initEnvVars:
-         * -> Initializes process.env with if arguments startoing with --qsenvxxx=yyy 
-         * -> Returns the arguments that are not env variables
-         * -> These args are sent to the child process
-         * childProcessArgs:
-         * -> Arguments used to launch the process
-         * -> Regular args + the ones returned by initEnvVars
-         * EG: npm run quantities-scenario1 -w apps/qsfab-perfs  -- --nbworkers=2
-         * --> nbWorkers if available in the child process through process.args
-         * Options:
-         * --es-module-specifier-resolution=node: allows to import je files without .js extension
-         * --> import QuantitiesWorkersManager from './src/QuantitiesWorkersManager' (no .js needed)
-         */
-        const runnerVars = initEnvVars(additionalEnvVars, options)
-       // let childProcessArgs = ['--no-warnings', '--es-module-specifier-resolution=node', '--trace-warnings', scriptFullPath, ...runnerVars]
-        let childProcessArgs = [scriptFullPath]
+        * initEnvVars:
+        * -> Initializes process.env with if arguments startoing with --qsenvxxx=yyy 
+        * -> Returns the arguments that are not env variables
+        * -> These args are sent to the child process
+        * childProcessArgs:
+        * -> Arguments used to launch the process
+        * -> Regular args + the ones returned by initEnvVars
+        * EG: npm run quantities-scenario1 -w apps/qsfab-perfs  -- --nbworkers=2
+        * --> nbWorkers if available in the child process through process.args
+        * Options:
+        * --es-module-specifier-resolution=node: allows to import je files without .js extension
+        * --> const QuantitiesWorkersManager = require('./src/QuantitiesWorkersManager' (no .js needed))
+        */
+        myConsole.highlight(`Init environment variables`)
+        const notEnvVarsArguments = initEnvVars(additionalEnvVars, options)
+        console.log('notEnvVarsArguments', JSON.stringify(notEnvVarsArguments, null, 2))
+        const command = options.command ?? 'node'
+        let childProcessArgs
+        let scriptFullPath
+        switch (command) {
+            case 'node':
+                scriptFullPath = path.resolve(appRootDir.get(), scriptRelativePath)
+                childProcessArgs = ['--no-warnings', '--es-module-specifier-resolution=node', '--trace-warnings', scriptFullPath, ...notEnvVarsArguments]
+                break
+            case 'artillery':
+                scriptFullPath = path.resolve(process.env.SLX_ARTILLERY_ROOT_DIR, scriptRelativePath, ...notEnvVarsArguments)
+                childProcessArgs = ['run', scriptFullPath]
+                break
+            default:
+                throw new Error(`Unexpected runner command [${options.command}] Expected[${_expectedCommands.join(',')}]`)
+        }
+        if (!fs.existsSync(scriptFullPath)) {
+            throw new Error(`Script file not found\n${scriptFullPath}`)
+        }
+        myConsole.lowlight(`\nCommand:\n- ${command}\nScript file path:\n- ${scriptFullPath}\nprocess.execPath:\n- ${process.execPath}`)
         /** RUN SCRIPT -Execute the script in a child process */
-        const scriptName = path.basename(scriptFullPath, '.js')
+        const scriptName = path.basename(scriptFullPath)
         let runErr = false
         process.env.SLDX_RUNNER_SCRIPT_NAME = scriptName
         try {
-            myConsole.superhighlight(`Run script ${scriptName} BEGIN`)
+            myConsole.superhighlight(`Run ${command} ${scriptName} BEGIN`)
             const modeShell = os.platform() == 'linux'
-            //execaSync(process.execPath, childProcessArgs, {
-            execaSync('artillery run', childProcessArgs, {
+            //execa.execaSync(process.execPath, childProcessArgs, {
+            execa.sync(command, childProcessArgs, {
                 stdio: [process.stdin, process.stdout, process.stderr],
                 /** Environment variables are passed to the child process by default */
                 env: process.env,
@@ -88,10 +98,10 @@ export default async function (scriptRelativePath, additionalEnvVars, options) {
              * The original cause thrown by the script is not present (e.cause)
              * --> We need to put a ty{}catch (e) {myConsole.error("ERROR", e)} in the script
              */
-            myConsole.error(`Run script ${scriptName} ERROR\n`, e)
+            myConsole.error(`Run ${command} ${scriptName} ERROR\n`, e)
             runErr = true
         } finally {
-            myConsole.superhighlight(`Run script ${scriptName} END ${runErr ? 'KO' : 'Ok'}\n`)
+            myConsole.superhighlight(`Run ${command} ${scriptName} END ${runErr ? 'KO' : 'Ok'}\n`)
         }
     } catch (e) {
         myConsole.error("RUNNER ERROR", e)

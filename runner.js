@@ -16,25 +16,21 @@
  *      - args[2]       artillery yml file to launch (process.env.SLX_ARTILLERY_ROOT_DIR/test-perfs-1.yml)
  *      -- --sldxenv    optional
  */
-import path from 'path'
-import fs from 'fs'
-import chalk from 'chalk'
-import { SLDX_ENV_VAR, SLDX_ENV_ARG } from '#env/defaultEnvVars'
-import myConsole from '#commons/myConsole'
-import initEnvVars from '#env/initEnvVars'
-import runner from '#env/runner'
-import appRootDir from 'app-root-dir'
+const path = require('path')
+const fs = require('fs')
+const { SLDX_ENV_VAR, SLDX_ENV_ARG } = require('#env/defaultEnvVars')
+const myConsole = require('#commons/myConsole')
+const runner = require('#env/runner')
+const appRootDir = require('app-root-dir')
 /** dotenv lib */
-import dotenv from 'dotenv'
-/** Loads .env file (at the root of the application) into environment variables */
-import 'dotenv/config'
-import _ from 'lodash'
-
+const dotenv = require('dotenv')
+const _ = require('lodash')
+const chalk = require('chalk')
 
 /** Just to create a log for the runner */
 process.env.SLDX_LOG_DIR = './'
-myConsole.enableConsole()
-await myConsole.initLoggerFromModule(import.meta)
+myConsole.initLoggerFromModule(__filename)
+myConsole.enableConsole();
 
 /**
  * Program arguments
@@ -58,7 +54,7 @@ dotenv.config()
 /*
 *  Program additional variables
 */
-let _nbSldxArgs=0
+let _nbSldxArgs = 0
 const MYENVVARS = [{
     /** Just to display the variable in the console */
     name: SLDX_ENV_VAR,
@@ -69,12 +65,12 @@ const MYENVVARS = [{
     if (x.arg && _argValues.has(x.arg)) {
         // argument overrides defaults and .env value
         x.value = _argValues.get(x.arg)
-        myConsole.lowlight(`${x.name}[${ x.value }] read from ${x.arg} argument`)
+        myConsole.lowlight(`${x.name}[${x.value}] read from ${x.arg} argument`)
         _nbSldxArgs++
     } else if (process.env[x.name] && process.env[x.name].length !== 0) {
         //.env overrides default value
         x.value = process.env[x.name]
-        myConsole.lowlight(`${x.name}[${ x.value }] read from .env file`)
+        myConsole.lowlight(`${x.name}[${x.value}] read from .env file`)
     }
     return x
 })
@@ -87,7 +83,7 @@ if (_.isEmpty(tests_env)) {
 }
 const dotEnvFileName = `sldx.${tests_env}.dotenv`
 const dotEnvFilePath = path.resolve(`./${dotEnvFileName}`)
-if (!fs.existsSync(dotEnvFilePath)){
+if (!fs.existsSync(dotEnvFilePath)) {
     throw new Error(`Expected env file path [${dotEnvFilePath}] not found`)
 }
 myConsole.lowlight(`Expected env file path [${dotEnvFilePath}]`)
@@ -98,7 +94,8 @@ if ((process.argv.length - _nbSldxArgs) == 2) {
     /**
      * If args are [node runner.js] (no script file) it just means 'display variables'
      */
-    initEnvVars(MYENVVARS,{
+    const initEnvVars = require('#env/initEnvVars')
+    initEnvVars(MYENVVARS, {
         dotenvpath: dotEnvFilePath
     })
     /** Display environment */
@@ -120,12 +117,24 @@ if ((process.argv.length - _nbSldxArgs) == 2) {
     /** END */
 }
 
-const artilleryYmlRelPath = process.argv[2]
-myConsole.lowlight(`artilleryYmlRelPath [${artilleryYmlRelPath}]`)
+const scriptRelPath = process.argv[2]
+myConsole.lowlight(`scriptRelPath [${scriptRelPath}]`)
+const runnerOptions = {
+    dotenvpath: dotEnvFilePath,
+    command: 'artillery'
+}
+switch (path.extname(scriptRelPath)){
+    case '.js':
+        runnerOptions.command = 'node'
+    break
+    case '.yml':
+        runnerOptions.command = 'artillery'
+    break
+    case '.yml':
+        throw new Error (`Unexpected srcipt extension Excpected [.js for node or .yml for atillery]`)
+    break
 
-
-runner(artilleryYmlRelPath, MYENVVARS, {
-    dotenvpath: dotEnvFilePath
-})
+}
+runner(scriptRelPath, MYENVVARS, runnerOptions)
 
 

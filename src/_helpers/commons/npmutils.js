@@ -1,11 +1,11 @@
 "use strict";
 
-import _ from 'lodash'
-import readPackageJon from 'read-package-json'
-import chalk from 'chalk'
-import path from 'path'
-import appRootDir from 'app-root-dir'
-import escapeStringRegexp from 'escape-string-regexp'
+const _ = require('lodash')
+const readPackageJon = require('read-package-json')
+const chalk = require('chalk')
+const path = require('path')
+const appRootDir = require('app-root-dir')
+const escapeStringRegexp = require('escape-string-regexp')
 
 
 /**
@@ -101,13 +101,13 @@ const _commandsList = async (textSearched) => {
     return res
 }
 
-export const commandsList = async () => {
+module.exports.commandsList = async () => {
     const args = process.argv.slice(2)
     const textSearched = (args[0] ?? '').toLowerCase()
     return _commandsList(textSearched)
 }
 
-export const scriptList = async () => {
+module.exports.scriptList = async () => {
     const list = await _commandsList(null)
     const scripts = []
     list.forEach(item => {

@@ -1,21 +1,21 @@
 'use strict';
-import appRootDir from 'app-root-dir'
 
- 
+const appRootDir = require('app-root-dir')
 
-export const ARGS_PREFIX = 'sldx'
-export const SLDX_ENV_VAR = 'SLDX_ENV'
+ const _ARGS_PREFIX = 'sldx'
+module.exports.ARGS_PREFIX = _ARGS_PREFIX
+module.exports.SLDX_ENV_VAR = 'SLDX_ENV'
 /** sldxenv */
-export const SLDX_ENV_ARG = `${ARGS_PREFIX}env`
-export const SLDX_LOG_ROOT_PATH = './_logs'
+module.exports.SLDX_ENV_ARG = `${_ARGS_PREFIX}env`
+module.exports.SLDX_LOG_ROOT_PATH = './_logs'
 
 const DEFAULT_VARS = [
     /** .env file id ./local.dotenv by default */
     {
-        name: SLDX_ENV_VAR,
+        name: module.exports.SLDX_ENV_VAR,
         value: 'local',
         highlight: true,
-        arg: SLDX_ENV_ARG
+        arg: module.exports.SLDX_ENV_ARG
     }, {
         name: 'SLX_ARTILLERY_ROOT_DIR',
         highlight: true,
@@ -80,34 +80,34 @@ const DEFAULT_VARS = [
         name: 'SLDX_LOG_DIR',
         dirPath: true,
         highlight: true,
-        arg: `${ARGS_PREFIX}LogDir`,
+        arg: `${_ARGS_PREFIX}LogDir`,
         /** /$host -> we create a SLDX_PROXY_HOST's hostname under /logs */
-        value: `${SLDX_LOG_ROOT_PATH}/$host`
+        value: `${module.exports.SLDX_LOG_ROOT_PATH}/$host`
     }, {
         name: 'SLDX_WORK_DIR',
         dirPath: true,
-        arg: `${ARGS_PREFIX}WorkDir`,
+        arg: `${_ARGS_PREFIX}WorkDir`,
         /** /$host -> we create a SLDX_PROXY_HOST's hostname under /workdir */
         value: './_workdir/$host'
     }, {
         name: 'SLDX_PROXY_HOST',
-        arg: `${ARGS_PREFIX}ProxyHost`,
+        arg: `${_ARGS_PREFIX}ProxyHost`,
         value: '',
         highlight: true
     }, {
         name: 'SLDX_PROXY_PORT',
-        arg: `${ARGS_PREFIX}ProxyPort`,
+        arg: `${_ARGS_PREFIX}ProxyPort`,
         value: '',
         allowEmpty: true,
         type: 'numeric',
         highlight: true
     }, {
         name: 'SLDX_ADMIN_USER',
-        arg: `${ARGS_PREFIX}AdmipUser`,
+        arg: `${_ARGS_PREFIX}AdmipUser`,
         highlight: true
     }, {
         name: 'SLDX_ADMIN_PASSWORD',
-        arg: `${ARGS_PREFIX}AdmipPwd`,
+        arg: `${_ARGS_PREFIX}AdmipPwd`,
         highlight: true
     }, {
         /** calculated by runner */
@@ -123,7 +123,7 @@ const DEFAULT_VARS = [
     }
 ]
 
-export function append(myEnvVars) {
+module.exports.append = function (myEnvVars) {
     myEnvVars ??= []
     const result = DEFAULT_VARS.concat(myEnvVars).map(x => {
         const res = Object.assign({
@@ -156,7 +156,7 @@ export function append(myEnvVars) {
 }
 
 /** return an array {name: value} for default env vars*/
-export const getValues = () => {
+module.exports.getValues = function (){
     const res = []
     for (const v of DEFAULT_VARS) {
         if (v) {

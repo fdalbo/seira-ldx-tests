@@ -1,12 +1,12 @@
 "use strict";
-import _ from 'lodash'
-import assert from 'assert'
-import { MongoClient } from 'mongodb'
-import { format as prettyFormat } from 'pretty-format'
-import myConsole from '#commons/myConsole'
-import SSHTunnel from 'ssh/SSHTunnel'
+const _ = require('lodash')
+const assert = require('assert')
+const { MongoClient } = require('mongodb')
+const { format: prettyFormat } = require('pretty-format')
+const myConsole = require('#commons/myConsole')
+const SSHTunnel = require('ssh/SSHTunnel')
 
-export default class MGOAccess {
+module.exports = class MGOAccess {
     #sshTunnel = null
     #mongoClient = null
     #mongoDb = null
@@ -39,7 +39,7 @@ export default class MGOAccess {
     }
     async close() {
         const log = this.verbose === true
-        log&& myConsole.highlight('mgoaccess.close')
+        log && myConsole.highlight('mgoaccess.close')
         if (this.#mongoClient) {
             log && myConsole.lowlight('-> 1.mgoaccess.mongoClient.close')
             await this.#mongoClient.close()

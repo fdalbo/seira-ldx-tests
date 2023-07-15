@@ -1,7 +1,7 @@
 'use strict';
 
-import jmespath from 'jmespath'
-import { format as prettyFormat } from 'pretty-format'
+const jmespath = require('jmespath')
+const { format: prettyFormat } = require('pretty-format')
 
 
 const LEVEL_NONE = 'none'
@@ -37,7 +37,7 @@ _levelInfo.values
  * Adds tooling to BaseClass
  * See BaseWorker, BaseWorkerParentPort, Listener, 
  */
-export default (BaseClass) => class extends BaseClass {
+module.exports = (BaseClass) => class extends BaseClass {
 
     __toolsMixinInit(name, konsole, options) {
         this.__konsole = konsole
@@ -126,7 +126,7 @@ export default (BaseClass) => class extends BaseClass {
         const current = _levelInfo.get(this.logLevel)
         const newLevel = _levelInfo.get(level)
         if (!newLevel || !current) {
-              return false
+            return false
         }
         return newLevel.order <= current.order
     }

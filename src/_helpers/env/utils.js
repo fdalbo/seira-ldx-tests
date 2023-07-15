@@ -1,13 +1,13 @@
 'use strict';
 
-import path from 'path'
-import appRootDir from 'app-root-dir'
-import readPckgAsync from 'read-package-json'
-import myConsole from '#commons/myConsole'
-import assert from 'assert'
-import _ from 'lodash'
+const path = require('path')
+const appRootDir = require('app-root-dir')
+const readPckgAsync = require('read-package-json')
+const myConsole = require('#commons/myConsole')
+const assert = require('assert')
+const _ = require('lodash')
 
-export const readPackageJson = async (rootDir, fail = true) => new Promise((resolve, reject) => {
+module.exports.readPackageJson = async (rootDir, fail = true) => new Promise((resolve, reject) => {
     const packagePath = path.resolve(rootDir, 'package.json')
     readPckgAsync(packagePath, console.error, false, (err, data) => {
         if (err && fail) {
@@ -19,7 +19,7 @@ export const readPackageJson = async (rootDir, fail = true) => new Promise((reso
         }
     })
 })
-export const getWorkspaceRootPath = async () => {
+module.exports.getWorkspaceRootPath = async () => {
     if (!process.env.SLDX_WORKSPACE_ROOTDIR) {
         let rootDir = appRootDir.get()
         let pckgJSon = await readPackageJson(rootDir, false)
@@ -36,4 +36,4 @@ export const getWorkspaceRootPath = async () => {
     return process.env.SLDX_WORKSPACE_ROOTDIR
 }
 
-export const resolveFromWorkspaceRoot = async (filePath) => path.resolve(await getWorkspaceRootPath(), filePath)
+module.exports.resolveFromWorkspaceRoot = async (filePath) => path.resolve(await getWorkspaceRootPath(), filePath)

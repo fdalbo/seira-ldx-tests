@@ -2,18 +2,18 @@
 
 'use strict';
 
-import isNumber from 'is-number'
-import path from 'path'
-import dotenv from 'dotenv'
-import parseArguments from 'minimist'
-import myConsole from '#commons/myConsole'
-import appRootDir from 'app-root-dir'
-import url from 'url'
-import fs from 'fs-extra'
-import dateFormat from "dateformat"
-import chalk from 'chalk'
+const isNumber = require('is-number')
+const path = require('path')
+const dotenv = require('dotenv')
+const parseArguments = require('minimist')
+const myConsole = require('#commons/myConsole')
+const appRootDir = require('app-root-dir')
+const url = require('url')
+const fs = require('fs-extra')
+const dateFormat = require("dateformat")
+const chalk = require('chalk')
 /** absolute path to avoid .js extension*/
-import { append as appendToDefaultVars, ARGS_PREFIX } from '#env/defaultEnvVars'
+const { append: appendToDefaultVars, ARGS_PREFIX } = require('#env/defaultEnvVars')
 
 const _traceVariables = (vars) => {
     const traceEnvs = []
@@ -69,7 +69,7 @@ const _initVarsFromDotenv = (optionsPath, argsPath, environmentVariables) => {
         }
     }
     /** dotenv file needed - override  */
-    myConsole.highlight(`dotenv file path comes from '${dotenvsource}'\n-> '${dotenvpath}'`)
+    myConsole.highlight(`dotenv file path:\n-> comes from '${dotenvsource}'\n-> '${dotenvpath}'`)
     if (fs.existsSync(dotenvpath)) {
         /** Load  dotenv.config and overrides the process.env variables*/
         const dotenvConfig = (dotenv.config({ path: dotenvpath }) ?? {}).parsed ?? {}
@@ -117,7 +117,7 @@ const _initVarsFromDotenv = (optionsPath, argsPath, environmentVariables) => {
  * --> Array that contains the aruments that are not environment variables
  * --> These arguments are passed to the chile process (see runner.js)
  */
-export default function initEnvVars(additionalEnvVars, options) {
+module.exports = function initEnvVars (additionalEnvVars, options) {
     options ??= {}
     additionalEnvVars ??= []
     /** 
@@ -137,14 +137,19 @@ export default function initEnvVars(additionalEnvVars, options) {
         string: environmentVariables.filter(x => x.type === 'string' && x.arg).map(x => x.arg),
         boolean: environmentVariables.filter(x => x.type === 'boolean' && x.arg).map(x => x.arg)
     }
-    //console.log(JSON.stringify(minimistOpts, null, 2))
+    console.log('minimistOpts', JSON.stringify(minimistOpts, null, 2))
+    console.log('process.argv.', JSON.stringify(process.argv, null, 2))
     const parsedArguments = parseArguments(process.argv.slice(2), minimistOpts)
+    console.log('parsedArguments', JSON.stringify(parsedArguments, null, 3))
     /** OVERRIDES ENV-VARS WITH DOTENV FILE IF ANY */
     _initVarsFromDotenv(options.dotenvpath, parsedArguments['dotenvpath'], environmentVariables)
     const notEnvVarsArguments = []
     /** OVERRIDES ENV-VARS WITH PROCESS ARGUMENTS IF ANY  */
     for (const [key, value] of Object.entries(parsedArguments)) {
-        if (!key.toLowerCase().startsWith(ARGS_PREFIX)) {
+        if (key == '_') {
+            continue
+        }
+        if (!key.toLowerCase().includes(ARGS_PREFIX)) {
             /** not an environment variable for us - we store it in order to sent it to the child process*/
             notEnvVarsArguments.push(`--${key}=${value}`)
             continue
@@ -222,9 +227,7 @@ export default function initEnvVars(additionalEnvVars, options) {
             }).join('/')
             const folderPath = _resolveRootPath(envVar.value)
             /** !!! LOGS ONlY - To not clear other directories like  SLDX_APP_ROOTDIR*/
-            console.log('removeLogDirFiles', removeLogDirFiles, envVar.name)
             if (envVar.name === 'SLDX_LOG_DIR' && removeLogDirFiles === true) {
-                console.log('folderPath', folderPath)
                 fs.emptyDirSync(folderPath)
             } else {
                 fs.ensureDirSync(folderPath)

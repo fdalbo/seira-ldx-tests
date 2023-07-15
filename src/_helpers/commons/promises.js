@@ -1,17 +1,17 @@
 
 'use strict';
 
-import isNumber from 'is-number'
-import myConsole from '#commons/myConsole'
-import { format as prettyFormat } from 'pretty-format'
+const isNumber = require('is-number')
+const myConsole = require('#commons/myConsole')
+const { format: prettyFormat } = require('pretty-format')
 
-export async function pause(ms) {
+module.exports.pause = async function pause(ms) {
     if (ms <= 0) return
     return new Promise(r => setTimeout(r, ms))
 }
 
 
-export class Deferred {
+module.exports.Deferred = class Deferred {
     #name = ''
     #resolve = null
     #reject = null

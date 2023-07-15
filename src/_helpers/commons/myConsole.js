@@ -1,15 +1,14 @@
 'use strict';
 
-import isNumber from 'is-number'
-import chalk from 'chalk'
-import clone from 'clone'
-import _ from 'lodash'
-import fs from 'fs'
-import path from 'path'
-import createLogger from '#commons/myLogger'
-import { filename } from 'dirname-filename-esm'
-import { isMainThread, threadId } from 'worker_threads'
-import stripAnsi from 'strip-ansi'
+const isNumber = require('is-number')
+const clone = require('clone')
+const _ = require('lodash')
+const fs = require('fs')
+const path = require('path')
+const createLogger = require('#commons/myLogger')
+const { isMainThread, threadId } = require('worker_threads')
+const stripAnsi = require('strip-ansi')
+const chalk = require('chalk')
 
 
 const _Console = function () {
@@ -123,10 +122,17 @@ const _Console = function () {
     /** 
      * Initialize the myLogger with the name of js file
      * call initLoggerFromModule(import.meta js) from the js file
-     * @param {string} import_meta provided by import.meta js file
+     * @param {string} import_meta provided by import.meta js file for esm ou __filename for commonjs
      */
     this.initLoggerFromModule = async (import_meta) => {
-        this.initLogger(path.basename(filename(import_meta), '.js'))
+        /** 
+         * with esm  initLoggerFromModule(import.meta)
+         *      import  { filename as filenameEsm } from 'dirname-filename-esm'
+         *      this.initLogger(filenameEsm(import_meta), '.js'))
+         * with commonjs  initLoggerFromModule(__filename)
+         *       this.initLogger(path.basename(import_meta, '.js'))
+         */
+        this.initLogger(path.basename(import_meta, '.js'))
     }
 
     /** opts: {
@@ -136,7 +142,7 @@ const _Console = function () {
      *      threadSafe: true
      * } 
      */
-    this.initLogger = async (logFileName, opts) => {
+    this.initLogger = (logFileName, opts) => {
         if (!process.env.SLDX_LOG_DIR) {
             this.warning(`Can't create qsConsolelogger [${logFileName}] - Process.env.SLDX_LOG_DIR is empty`)
             return
@@ -441,7 +447,7 @@ const _Console = function () {
  * We store the console in process.sldxGlobals in order to retreive and create the console if not exists
  * Useful to push/pop loggers with the name of the test file that is executed
  */
-const globalsKey = `qsconsole_${process.pid}`
+const globalsKey = `lsdxconsole_${process.pid}`
 /** Same as for jestContext.js */
 if (!process.sldxGlobals) process.sldxGlobals = {}
 if (!process.sldxGlobals[globalsKey]) {
@@ -457,7 +463,8 @@ if (!process.sldxGlobals[globalsKey]) {
      */
     konsole.setTraceEnvConfig(process)
 }
-export default process.sldxGlobals[globalsKey]
+
+module.exports = process.sldxGlobals[globalsKey]
 
 
 
