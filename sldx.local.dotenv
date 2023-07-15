@@ -1,0 +1,8 @@
+SLDX_LOG_LEVEL = 'debug'
+SLDX_LOG_DIR = './_logs/$host/$day/tests'
+SLDX_WORK_DIR = './_workdir/$host/$day/tests'
+SLDX_PROXY_HOST = 'https://localhost'
+SLDX_PROXY_PORT= '2020'
+SLDX_ADMIN_USER = 'admin'
+SLDX_ADMIN_PASSWORD = 'admin'
+

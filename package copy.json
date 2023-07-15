@@ -1,0 +1,60 @@
+{
+  "name": "seira-ldx-tests",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "scripts": {
+    "perfs.test1": "node runner.js ./src/artillery/test-perfs-1.yml"
+  },
+  "imports": {
+    "@src/*": "./src/*",
+    "@helpers/*": "./src/_helpers/*",
+    "#commons/*": "./src/_helpers/commons/*",
+    "@runner/*": "./src/_helpers/runner/*",
+    "@imports/*": "./src/_helpers/imports/*",
+    "@dbs/*": "./src/_helpers/dbs/*"
+  },
+  "exports": {
+    "./src/*": "./src/*.js",
+    "./helpers/*": "./src/_helpers/*.js",
+    "./commons/*": "./src/_helpers/commons/*.js",
+    "./runner/*": "./src/_helpers/runner/*.js",
+    "./imports/*": "./src/_helpers/imports/*.js",
+    "./dbs/*": "./src/_helpers/dbs/*.js"
+  },
+  "dependencies": {
+    "app-root-dir": "^1.0.2",
+    "chalk": "^5.3.0",
+    "clone": "^2.1.2",
+    "dateformat": "^5.0.3",
+    "dirname-filename-esm": "^1.1.1",
+    "dotenv": "^16.3.1",
+    "escape-string-regexp": "^5.0.0",
+    "execa": "^7.1.1",
+    "fs-extra": "^11.1.1",
+    "is-number": "^7.0.0",
+    "is-valid-path": "^0.1.1",
+    "jmespath": "^0.16.0",
+    "lodash": "^4.17.21",
+    "minimist": "^1.2.8",
+    "moment-timezone": "^0.5.43",
+    "n-readlines": "^1.0.1",
+    "numeral": "^2.0.6",
+    "pretty-format": "^29.6.1",
+    "read-package-json": "^6.0.4",
+    "rimraf": "^5.0.1",
+    "strip-ansi": "^7.1.0",
+    "winston": "^3.10.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.36.0",
+    "cross-env": "^7.0.3",
+    "eslint": "^8.44.0",
+    "eslint-import-resolver-alias": "^1.1.2",
+    "eslint-plugin-import": "^2.27.5"
+  }
+}

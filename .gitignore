@@ -1,0 +1,10 @@
+**/node_modules/
+**/_logs
+**/_workdir
+**/logs
+**/workdir
+**/_unused
+**/playwright-report/
+**/playwright/.cache/
+**/*.log
+**/*.env

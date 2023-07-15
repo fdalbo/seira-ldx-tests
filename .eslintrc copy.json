@@ -1,0 +1,43 @@
+{
+    "env": {
+        "es2022": true,
+        "node": true,
+        "jest": true
+    },
+    "extends": [
+        "eslint:recommended",
+        "plugin:import/recommended"
+    ],
+    "parserOptions": {
+        /** 
+        * ecmaVersion should be removed if "es2022: true" but if we remove it the following code is not parsed
+        * - import { dirname } from "dirname-filename-esm"
+        * - const __dirname = dirname(import.meta) --> import.meta in red
+        */
+        "ecmaVersion": 13,
+        "sourceType": "module"
+    },
+    "rules": {
+        "import/no-unresolved": [
+            2,
+            {
+                "commonjs": false,
+                "amd": false
+            }
+        ]
+    },
+    "settings": {
+        "import/resolver": {
+            "alias": {
+                "map": [
+                    ["src", "./src"],
+                    ["main/commons", "./src/_helpers/commons"],
+                    ["env", "./src/_helpers/env"],
+                    ["imports", "./src/_helpers/imports"],
+                    ["dbs", "./src/_helpers/dbs"]
+                ],
+                "extensions": [".ts", ".js", ".jsx", ".json"]
+            }
+        }
+    }
+}
