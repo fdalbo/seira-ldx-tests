@@ -20,12 +20,12 @@ const _Console = function () {
     let loggerStack = []
     let _currentLogger = null
     const _t0 = (() => {
-        let globalT0 = process.env.QS_TRACE_T0
+        let globalT0 = process.env.SLDX_TRACE_T0
         if (isNumber(globalT0)) {
             globalT0 = parseInt(globalT0)
         } else {
             globalT0 = new Date().getTime()
-            process.env.QS_TRACE_T0 = globalT0.toString()
+            process.env.SLDX_TRACE_T0 = globalT0.toString()
         }
         return globalT0
     })()
@@ -208,10 +208,12 @@ const _Console = function () {
     }
 
     this.enableConsole = (yes = true) => {
-        if (_traceConsole == null || _traceConsole != yes) {
-            console.log(chalk.magentaBright(`console ${yes ? 'enabled' : 'disbaled'}`))
+        const oldState= _traceConsole == true
+        const newSate = yes == true
+        if (newSate != oldState) {
+            console.log(chalk.magentaBright(`${_threadPrefix} console ${newSate ? 'enabled' : 'disabled'}`))
         }
-        _traceConsole = yes == true
+        _traceConsole = newSate
     }
 
     const _consoleLog = (...args) => {

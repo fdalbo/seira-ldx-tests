@@ -16,65 +16,66 @@ const getPageId = (pwPage) => {
   return url.pathname.substring(url.pathname.lastIndexOf('/'))
 }
 
-const displayPageId = (pwPage) => {
+const waitPage = async (pwPage) => {
+  _pageIdx++
+  await pause(1000);
   myConsole.lowlight(`page[${_pageIdx}] ${getPageId(pwPage)}`)
 }
 
 const gotoPage = async (pwPage, path) => {
   myConsole.lowlight(`gotoPage ${path}`)
-  _pageIdx++
   await pwPage.goto(fullUrl(path))
-  await pause(1000);
-  displayPageId(pwPage)
+  await waitPage(pwPage)
 }
 
 const fillLabel = async (pwPage, label, value) => {
   myConsole.lowlight(`fillLabel '${label}'`)
-  return pwPage.getByLabel(label).fill(value);
+  return pwPage.getByLabel(label).fill(value)
 }
 
-const clickButton = async (pwPage, name, changePage = true) => {
-  changePage && _pageIdx++
+const clickButton = async (pwPage, name) => {
   myConsole.lowlight(`clickButton '${name}'`)
-  await pwPage.getByRole('button', { name: name }).click();
-  await pause(1000);
-  displayPageId(pwPage)
+  await pwPage.getByRole('button', { name: name }).click()
+  await waitPage(pwPage)
 }
-const clickLink = async (pwPage, name, changePage = true) => {
-  changePage && _pageIdx++
+const clickLink = async (pwPage, name) => {
   myConsole.lowlight(`clickLink '${name}'`)
-  await pwPage.getByRole('link', { name: name }).click();
-  await pause(1000);
-  displayPageId(pwPage)
+  await pwPage.getByRole('link', { name: name }).click()
+  await waitPage(pwPage)
 }
-const clickImg = async (pwPage, title, changePage = true) => {
-  changePage && _pageIdx++
-  myConsole.lowlight(`clickImg ${title}`)
-  await pwPage.getByTitle(title).getByRole('img').click();
-  await pause(1000);
-  displayPageId(pwPage)
+const clickTile = async (pwPage, title) => {
+  myConsole.lowlight(`clickTile ${title}`)
+  await pwPage.getByTitle(title).click();
+  await waitPage(pwPage)
 }
 
 
+const _scriptId='TEST1'
 async function test1(pwPage) {
-  myConsole.superhighlight('BEGIN TEST1')
-  const traceEnv = []
+  myConsole.initLoggerFromModule(__filename)
+  const userNum = process.env.LOCAL_WORKER_ID ?? ''
+  const user = `user${process.env.LOCAL_WORKER_ID}`
+  const password = 'seira'
+  if (userNum.length == 0 || isNaN(userNum)) {
+    throw new Error(`Unexpected empty 'LOCAL_WORKER_ID' env variable`)
+  }
   try {
+    myConsole.superhighlight(`BEGIN ${_scriptId} user[${user}]`)
+    const traceEnv = []
     for (const [key, value] of Object.entries(process.env)) {
-      key.startsWith('SLDX') && traceEnv.push(`${key}=${value}`)
+      (key == 'LOCAL_WORKER_ID' || key.startsWith('SLDX')) && traceEnv.push(`${key}=${value}`)
     }
-    myConsole.lowlight(`SLDX Variables:\n${traceEnv.join('\n')}`)
+    myConsole.lowlight(`SLDX Variables:\n${traceEnv.join('\n')}\n`)
     await gotoPage(pwPage, `/client`);
-    await fillLabel(pwPage, 'Veuillez entrer votre identifiant ou e-mail *', 'user1');
-    await fillLabel(pwPage, 'Mot de passe : *', 'seira');
+    await fillLabel(pwPage, 'Veuillez entrer votre identifiant ou e-mail *', user)
+    await fillLabel(pwPage, 'Mot de passe : *', password)
     await clickButton(pwPage, 'Connexion')
-    await clickImg(pwPage, 'Apprenant');
-    await clickLink(pwPage, 'Toutes mes sessions');
+    await clickTile(pwPage, 'Apprenant')
+    await clickLink(pwPage, 'Toutes mes sessions')
   } catch (e) {
-    myConsole.error("END TEST1 ERROR", e)
-    await pause(1000);
+    myConsole.error(`END ${_scriptId} ERROR user[${user}]`, e)
     throw e
   }
-  myConsole.superhighlight('END TEST1 OK')
+  myConsole.superhighlight(`END ${_scriptId} OK user[${user}]`)
   await pause(1000);
 }

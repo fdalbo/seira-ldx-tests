@@ -13,6 +13,8 @@ const _myFormat = winston.format.printf(({ level, message, timestamp }) => {
     return `${timestamp} ${message}`
 })
 
+const _threadPrefix = isMainThread ? 'MAIN ' : `W${threadId.toString().padStart(3, '0')} `
+
 class Logger {
     #filePath = null
     #myLogger = null
@@ -67,22 +69,22 @@ class Logger {
         return this.#myLogger && this.#myLogger.level
     }
     debug(message, ...splatArgs) {
-        this.#myLogger && this.#myLogger.log.apply(this.#myLogger, ['debug', message, ...splatArgs])
+        this.#myLogger && this.#myLogger.log.apply(this.#myLogger, ['debug', `${_threadPrefix}${message}`, ...splatArgs])
     }
     info(message, ...splatArgs) {
-        this.#myLogger && this.#myLogger.log.apply(this.#myLogger, ['info', message, ...splatArgs])
+        this.#myLogger && this.#myLogger.log.apply(this.#myLogger, ['info', `${_threadPrefix}${message}`, ...splatArgs])
     }
     warn(message, ...splatArgs) {
-        this.#myLogger && this.#myLogger.log.apply(this.#myLogger, ['warn', message, ...splatArgs])
+        this.#myLogger && this.#myLogger.log.apply(this.#myLogger, ['warn', `${_threadPrefix}${message}`, ...splatArgs])
     }
     error(message, ...splatArgs) {
-        this.#myLogger && this.#myLogger.log.apply(this.#myLogger, ['error', message, ...splatArgs])
+        this.#myLogger && this.#myLogger.log.apply(this.#myLogger, ['error', `${_threadPrefix}${message}`, ...splatArgs])
     }
     /**
      * 'error' level - log all
      */
     all(message, ...splatArgs) {
-        this.#myLogger && this.#myLogger.log.apply(this.#myLogger, ['error', message, ...splatArgs])
+        this.#myLogger && this.#myLogger.log.apply(this.#myLogger, ['error', `${_threadPrefix}${message}`, ...splatArgs])
     }
     async close() {
         this.#myLogger && this.#myLogger.clear()

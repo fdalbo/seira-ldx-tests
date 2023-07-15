@@ -137,10 +137,7 @@ module.exports = function initEnvVars (additionalEnvVars, options) {
         string: environmentVariables.filter(x => x.type === 'string' && x.arg).map(x => x.arg),
         boolean: environmentVariables.filter(x => x.type === 'boolean' && x.arg).map(x => x.arg)
     }
-    console.log('minimistOpts', JSON.stringify(minimistOpts, null, 2))
-    console.log('process.argv.', JSON.stringify(process.argv, null, 2))
     const parsedArguments = parseArguments(process.argv.slice(2), minimistOpts)
-    console.log('parsedArguments', JSON.stringify(parsedArguments, null, 3))
     /** OVERRIDES ENV-VARS WITH DOTENV FILE IF ANY */
     _initVarsFromDotenv(options.dotenvpath, parsedArguments['dotenvpath'], environmentVariables)
     const notEnvVarsArguments = []

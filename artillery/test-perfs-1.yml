@@ -1,5 +1,9 @@
 config:
   target: http://localhost:2020/
+  phases:
+    - duration: 3
+      arrivalRate: 1
+      rampTo: 5
   # Load the Playwright engine:
   engines:
     playwright: {}
