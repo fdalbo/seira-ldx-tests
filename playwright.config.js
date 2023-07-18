@@ -11,7 +11,8 @@ const { defineConfig, devices } = require('@playwright/test')
  * @see https://playwright.dev/docs/test-configuration
  */
 module.exports = defineConfig({
-  testDir: './_playwright/tests',
+  testDir: 'playwright',
+  outputDir: 'test-results',
   /* Run tests in files in parallel */
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
@@ -38,6 +39,15 @@ module.exports = defineConfig({
       use: { ...devices['Desktop Chrome'] },
     }
   ],
+
+  // path to the global setup files.
+  globalSetup: require.resolve('./global-setup'),
+
+  // path to the global teardown files.
+  globalTeardown: require.resolve('./global-teardown'),
+
+  // Each test is given 30 seconds.
+  timeout: 30000,
 
   /* Run your local dev server before starting the tests */
   // webServer: {

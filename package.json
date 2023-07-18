@@ -8,8 +8,9 @@
   "author": "",
   "license": "ISC",
   "scripts": {
-    "displayEnVariables": "node runner.js",
-    "perfs.test1": "node runner.js test-perfs-1.yml"
+    "displayEnVariables": "node runner.artillery.js",
+    "artillery.script1": "node runner.artillery.js test-script1.yml",
+    "playwright.script1": "node runner.playwright.js script1.spec.js"
   },
   "imports": {
     "#src/*": "./src/*.js",
@@ -17,7 +18,8 @@
     "#commons/*": "./src/_helpers/commons/*.js",
     "#env/*": "./src/_helpers/env/*.js",
     "#imports/*": "./src/_helpers/imports/*.js",
-    "#dbs/*": "./src/_helpers/dbs/*.js"
+    "#dbs/*": "./src/_helpers/dbs/*.js",
+    "#scripts/*": "./src/scripts/*.js"
   },
   "dependencies": {
     "app-root-dir": "~1.0.2",

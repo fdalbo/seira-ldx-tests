@@ -1,21 +1,19 @@
 'use strict';
 
 const appRootDir = require('app-root-dir')
-
- const _ARGS_PREFIX = 'sldx'
+const _ = require('lodash')
+const _ARGS_PREFIX = 'sldx'
 module.exports.ARGS_PREFIX = _ARGS_PREFIX
-module.exports.SLDX_ENV_VAR = 'SLDX_ENV'
-/** sldxenv */
-module.exports.SLDX_ENV_ARG = `${_ARGS_PREFIX}env`
-module.exports.SLDX_LOG_ROOT_PATH = './_logs'
-
+const _SLDX_ENV_VAR = 'SLDX_ENV'
+/** -- --sldxenv=xxx */
+const _SLDX_ENV_ARG = `${_ARGS_PREFIX}env`
 const DEFAULT_VARS = [
     /** .env file id ./local.dotenv by default */
     {
-        name: module.exports.SLDX_ENV_VAR,
+        name: _SLDX_ENV_VAR,
         value: 'local',
         highlight: true,
-        arg: module.exports.SLDX_ENV_ARG
+        arg: _SLDX_ENV_ARG
     }, {
         name: 'SLX_ARTILLERY_ROOT_DIR',
         highlight: true,
@@ -26,7 +24,7 @@ const DEFAULT_VARS = [
         dirPath: true,
         highlight: true,
         value: './playwright',
-    },{
+    }, {
         /** false doesn't trace http Req/Resp and myConsole.trace() in the console (only in log file)*/
         name: 'SLDX_TRACE_CONSOLE',
         allowEmpty: true,
@@ -77,29 +75,43 @@ const DEFAULT_VARS = [
         /** no workspace */
         value: appRootDir.get()
     }, {
-        name: 'SLDX_LOG_DIR',
+        name: 'SLDX_LOG_DIR_PATH',
         dirPath: true,
         highlight: true,
         arg: `${_ARGS_PREFIX}LogDir`,
-        /** /$host -> we create a SLDX_PROXY_HOST's hostname under /logs */
-        value: `${module.exports.SLDX_LOG_ROOT_PATH}/$host`
+        /** /$host -> we create a SLDX_PROXY_HOST's hostname under /SLDX_LOG_DIR_PATH */
+        value: `./_logs/$host`
     }, {
-        name: 'SLDX_WORK_DIR',
+        name: 'SLDX_WORK_DIR_PATH',
         dirPath: true,
         arg: `${_ARGS_PREFIX}WorkDir`,
-        /** /$host -> we create a SLDX_PROXY_HOST's hostname under /workdir */
+        /** /$host -> we create a SLDX_PROXY_HOST's hostname under /SLDX_WORK_DIR_PATH */
         value: './_workdir/$host'
+    }, {
+        name: 'SLDX_MONGO_HOST',
+        value: '127.0.0.1'
+    }, {
+        name: 'SLDX_MONGO_PORT',
+        value: '27017'
+    }, {
+        name: 'SLDX_PROXY_PROTOCOL',
+        arg: `${_ARGS_PREFIX}ProxyProtocol`,
+        value: ''
     }, {
         name: 'SLDX_PROXY_HOST',
         arg: `${_ARGS_PREFIX}ProxyHost`,
-        value: '',
-        highlight: true
+        value: ''
     }, {
         name: 'SLDX_PROXY_PORT',
         arg: `${_ARGS_PREFIX}ProxyPort`,
         value: '',
         allowEmpty: true,
-        type: 'numeric',
+        type: 'numeric'
+    }, {
+        name: 'SLDX_PROXY_URL',
+        allowEmpty: true,
+        /* calculated */
+        value: '',
         highlight: true
     }, {
         name: 'SLDX_ADMIN_USER',
@@ -110,21 +122,45 @@ const DEFAULT_VARS = [
         arg: `${_ARGS_PREFIX}AdmipPwd`,
         highlight: true
     }, {
+        name: 'SLDX_USER_FIRST_IDX',
+        type: 'numeric',
+        value: '0'
+    }, {
+        name: 'SLDX_USER_PREFIX',
+        value: 'user'
+    }, {
+        name: 'SLDX_USER_PWD',
+        value: 'seira'
+    }, {
+        /* calculated by runner node, playwright, artillery*/
+        name: 'SLDX_RUNNER_EXEC',
+        allowEmpty: true,
+        value: ''
+    }, {
         /** calculated by runner */
         name: 'SLDX_RUNNER_SCRIPT_NAME',
         allowEmpty: true,
         value: ''
     }, {
-        name: 'SLDX_MONGO_HOST',
-        value: '127.0.0.1'
-    }, {
-        name: 'SLDX_MONGO_PORT',
-        value: '27017'
+        name: 'SLDX_PLAYWRIGHT_USER',
+        allowEmpty: true,
+        arg: `${_ARGS_PREFIX}pwuser`,
+        value: ''
     }
 ]
 
-module.exports.append = function (myEnvVars) {
+/**
+ * Apends MyEnvVars to DEFAULT_VARS
+ * @param {[{vars}]} myEnvVars 
+ * @returns the new vars array
+ */
+module.exports.appendToDefaultVars = function (myEnvVars) {
     myEnvVars ??= []
+    for (const v in myEnvVars) {
+        if (!_.isPlainObject(v) || _.isEmpty(v.name)) {
+            throw new Error(`Bad format for additional variable. {name: 'VAR_NAME'} expected\n${JSON.stringify(myEnvVars, null, 2)}`)
+        }
+    }
     const result = DEFAULT_VARS.concat(myEnvVars).map(x => {
         const res = Object.assign({
             arg: null,
@@ -144,7 +180,7 @@ module.exports.append = function (myEnvVars) {
     })
     // filter [,,] mistakes
     return result.filter(x => {
-        x.name=x.name.replaceAll(' ', '')
+        x.name = x.name.replaceAll(' ', '')
         if (x == null) {
             return false
         }
@@ -155,8 +191,10 @@ module.exports.append = function (myEnvVars) {
     })
 }
 
-/** return an array {name: value} for default env vars*/
-module.exports.getValues = function (){
+/** 
+ * @return an array {name: value} for default env vars
+ */
+module.exports.getEnvValues = function () {
     const res = []
     for (const v of DEFAULT_VARS) {
         if (v) {
@@ -166,4 +204,38 @@ module.exports.getValues = function (){
         }
     }
     return res
+}
+
+/**
+ * Program arguments
+ * - npm run perfs.test1 -- --sldxenv=local
+ * Read arguments that start with --${ARGS_PREFIX}
+ * @returns  a map with argid/argValue
+ */
+module.exports.readProccessArgument = function () {
+    const argValues = new Map()
+    const myArgsPrefix = `--${_ARGS_PREFIX}`
+    for (let arg of process.argv) {
+        arg = arg.replace(/\s/g, '')
+        if (!arg.startsWith(myArgsPrefix)) {
+            continue
+        }
+        arg = arg.split('--')[1].split('=')
+        argValues.set(arg[0], arg[1] ?? '')
+    }
+    return argValues
+}
+module.exports.readSldxEnv = function (myConsole) {
+    process.env[_SLDX_ENV_VAR] ??= ''
+    const myArgs = module.exports.readProccessArgument()
+    if (myArgs.has(_SLDX_ENV_ARG)) {
+        process.env[_SLDX_ENV_VAR] = myArgs.get(_SLDX_ENV_ARG)
+        myConsole.lowlight(`${_SLDX_ENV_VAR}='${process.env[_SLDX_ENV_VAR]}' read from --${_SLDX_ENV_ARG} argument`)
+    } else if (process.env[_SLDX_ENV_VAR].length > 0) {
+        myConsole.lowlight(`${_SLDX_ENV_VAR}='${process.env[_SLDX_ENV_VAR]}' read from .env file`)
+    }
+    if (process.env[_SLDX_ENV_VAR].trim().length == 0) {
+        throw new Error(`Unexpected empty variable ${_SLDX_ENV_VAR}`)
+    }
+    return process.env[_SLDX_ENV_VAR]
 }

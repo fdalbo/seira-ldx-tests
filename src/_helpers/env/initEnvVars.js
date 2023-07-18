@@ -8,12 +8,11 @@ const dotenv = require('dotenv')
 const parseArguments = require('minimist')
 const myConsole = require('#commons/myConsole')
 const appRootDir = require('app-root-dir')
-const url = require('url')
 const fs = require('fs-extra')
 const dateFormat = require("dateformat")
 const chalk = require('chalk')
 /** absolute path to avoid .js extension*/
-const { append: appendToDefaultVars, ARGS_PREFIX } = require('#env/defaultEnvVars')
+const { appendToDefaultVars, ARGS_PREFIX } = require('#env/defaultEnvVars')
 
 const _traceVariables = (vars) => {
     const traceEnvs = []
@@ -69,7 +68,6 @@ const _initVarsFromDotenv = (optionsPath, argsPath, environmentVariables) => {
         }
     }
     /** dotenv file needed - override  */
-    myConsole.highlight(`dotenv file path:\n-> comes from '${dotenvsource}'\n-> '${dotenvpath}'`)
     if (fs.existsSync(dotenvpath)) {
         /** Load  dotenv.config and overrides the process.env variables*/
         const dotenvConfig = (dotenv.config({ path: dotenvpath }) ?? {}).parsed ?? {}
@@ -117,7 +115,7 @@ const _initVarsFromDotenv = (optionsPath, argsPath, environmentVariables) => {
  * --> Array that contains the aruments that are not environment variables
  * --> These arguments are passed to the chile process (see runner.js)
  */
-module.exports = function initEnvVars (additionalEnvVars, options) {
+module.exports = function initEnvVars(additionalEnvVars, options) {
     options ??= {}
     additionalEnvVars ??= []
     /** 
@@ -181,7 +179,6 @@ module.exports = function initEnvVars (additionalEnvVars, options) {
     if (validationErrs.length > 0) {
         throw new Error(`Environment variables validation failed:\n-${validationErrs.join('\n-')}`)
     }
-
     /** 
      * 1/ RESOLVES FOLDERS PATH
      * - !! Resolves 
@@ -193,8 +190,7 @@ module.exports = function initEnvVars (additionalEnvVars, options) {
      * 2/ ADDS PROCESS.ENV VARIABLES FROM environmentVariable
      */
     const removeLogDirFiles = environmentVariables.find(x => x.name == 'SLDX_LOG_DIR_REMOVE_FILES')?.value == 'true'
-    const SLDX_PROXY_HOST = environmentVariables.find(x => x.name == 'SLDX_PROXY_HOST')?.value
-    const urlPath = SLDX_PROXY_HOST ? new URL(SLDX_PROXY_HOST).hostname.replace(/([^a-zA-Z0-9])/g, '-') : 'nohost'
+    const urlPath = process.env.SLDX_PROXY_HOST.replace(/([^a-zA-Z0-9])/g, '-')
     const datePath = dateFormat(new Date(), 'yyyy-mm-dd-HH-MM-ss')
     const dayPath = dateFormat(new Date(), 'yyyy-mm-dd')
     for (const envVar of environmentVariables) {
@@ -224,12 +220,16 @@ module.exports = function initEnvVars (additionalEnvVars, options) {
             }).join('/')
             const folderPath = _resolveRootPath(envVar.value)
             /** !!! LOGS ONlY - To not clear other directories like  SLDX_APP_ROOTDIR*/
-            if (envVar.name === 'SLDX_LOG_DIR' && removeLogDirFiles === true) {
+            if (envVar.name === 'SLDX_LOG_DIR_PATH' && removeLogDirFiles === true) {
                 fs.emptyDirSync(folderPath)
             } else {
                 fs.ensureDirSync(folderPath)
             }
             envVar.value = folderPath
+        }
+        if (envVar.name === 'SLDX_PROXY_URL') {
+            /** SLDX_PROXY_URL */
+            envVar.value = `${process.env.SLDX_PROXY_PROTOCOL}://${process.env.SLDX_PROXY_HOST}${process.env.SLDX_PROXY_PORT ? `:${process.env.SLDX_PROXY_PORT}` : ''}`
         }
         /** UPDATE process.env */
         process.env[envVar.name] = envVar.value

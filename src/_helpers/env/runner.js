@@ -9,9 +9,11 @@ const path = require('path')
 const execa = require('execa')
 const myConsole = require('#commons/myConsole')
 const { pause } = require('#commons/promises')
+const { ARGS_PREFIX, readSldxEnv, readProccessArgument } = require('#env/defaultEnvVars')
 const initEnvVars = require('#env/initEnvVars')
 const appRootDir = require('app-root-dir')
 const os = require('os')
+const dotenv = require('dotenv')
 
 /**
  * Node uncaughtException
@@ -22,60 +24,106 @@ process.on('uncaughtException', function (err) {
     setTimeout(() => process.exit(), 500)
 })
 
-module.exports = async function (scriptRelativePath, additionalEnvVars, options) {
+
+const _init = (mainScriptPath, additionalEnvVars) => {
+    additionalEnvVars ??= []
+    /** Just to create a runner.log for the runner */
+    myConsole.initLoggerFromModule(mainScriptPath, { logDirPath: './' })
+    myConsole.enableConsole()
+    dotenv.config({
+        /** root .env */
+        path: `${appRootDir.get()}/.env`
+    })
+    /**
+     * Program arguments
+     * npm run perfs.test1 -- --sldxenv=local
+     * --> Reads sldxenv in arguments
+     * --> Expected dotEnvFilePath for the scenario: 'sldx.local.dotenv'
+     * npm run perfs.test1
+     * --> Reads sldxenv .env  (fSLDX_ENV=local)
+     * --> Expected dotEnvFilePath for the scenario: 'sldx.local.dotenv'
+     */
+    const tests_env = readSldxEnv(myConsole)
+    const dotEnvFileName = `${ARGS_PREFIX}.${tests_env}.dotenv`
+    const dotEnvFilePath = path.resolve(`./${dotEnvFileName}`)
+    if (!fs.existsSync(dotEnvFilePath)) {
+        throw new Error(`Expected env file path [${dotEnvFilePath}] not found`)
+    }
+    myConsole.highlight(`Init environment variables\ndotEnvFilePath [${dotEnvFilePath}]`)
+    const notEnvVarsArguments = initEnvVars(additionalEnvVars, {
+        dotenvpath: dotEnvFilePath
+    })
+    const _myArgs = readProccessArgument()
+    if ((process.argv.length - _myArgs.size) == 2) {
+        /**
+         * If no script file argument it just means 'display variables'
+         * npm run displayEnVariables
+         */
+        process.exit(0)
+        /** END */
+    }
+    return notEnvVarsArguments
+}
+
+/**
+ *  
+ * @param {*} mainScriptPath    given by caller's __filename 
+ * @param {*} additionalEnvVars additional environment variables
+ * @param {*} options           command to launch
+ */
+module.exports = async function (mainScriptPath, additionalEnvVars, options) {
+    let runErr = false
     try {
+        /**
+         * notEnvVarsArguments: arguments tat 
+         */
+        let notEnvVarsArguments = _init(mainScriptPath, additionalEnvVars)
+        const scriptToRunRelativePath = process.argv[2]
         myConsole.superhighlight(`RUNNER: BEGIN - Process: ${process.pid}`)
-        additionalEnvVars ??= []
         options = Object.assign({}, {
-            dotenvpath: null,
-            /** 'node', 'artillery' */
-            command: null
+            /** 'node', 'artillery', playwright */
+            exec: null
         }, options ?? {})
-        /** 
-        * initEnvVars:
-        * -> Initializes process.env with if arguments startoing with --qsenvxxx=yyy 
-        * -> Returns the arguments that are not env variables
-        * -> These args are sent to the child process
-        * childProcessArgs:
-        * -> Arguments used to launch the process
-        * -> Regular args + the ones returned by initEnvVars
-        * EG: npm run quantities-scenario1 -w apps/qsfab-perfs  -- --nbworkers=2
-        * --> nbWorkers if available in the child process through process.args
-        * Options:
-        * --es-module-specifier-resolution=node: allows to import je files without .js extension
-        * --> const QuantitiesWorkersManager = require('./src/QuantitiesWorkersManager' (no .js needed))
-        */
-        myConsole.highlight(`Init environment variables`)
-        const notEnvVarsArguments = initEnvVars(additionalEnvVars, options)
-        console.log('notEnvVarsArguments', JSON.stringify(notEnvVarsArguments, null, 2))
-        const command = options.command ?? 'node'
+        let exec = options.exec ?? ''
         let childProcessArgs
-        let scriptFullPath
-        switch (command) {
+        let scriptToRunFullPath
+        switch (exec) {
             case 'node':
-                scriptFullPath = path.resolve(appRootDir.get(), scriptRelativePath)
-                childProcessArgs = ['--no-warnings', '--es-module-specifier-resolution=node', '--trace-warnings', scriptFullPath, ...notEnvVarsArguments]
+                scriptToRunFullPath = path.resolve(appRootDir.get(), scriptToRunRelativePath)
+                childProcessArgs = ['--no-warnings', '--es-module-specifier-resolution=node', '--trace-warnings', scriptToRunFullPath, ...notEnvVarsArguments]
                 break
             case 'artillery':
-                scriptFullPath = path.resolve(process.env.SLX_ARTILLERY_ROOT_DIR, scriptRelativePath, ...notEnvVarsArguments)
-                childProcessArgs = ['run', scriptFullPath]
+                scriptToRunFullPath = path.resolve(process.env.SLX_ARTILLERY_ROOT_DIR, scriptToRunRelativePath)
+                myConsole.lowlight(`\nArtillery config:\n${fs.readFileSync(scriptToRunFullPath, { encoding: "utf8" })}\n`)
+                childProcessArgs = ['run', scriptToRunFullPath, ...notEnvVarsArguments]
+                break
+            case 'playwright':
+                scriptToRunFullPath = path.resolve(process.env.SLX_PLAYWRIGHT_ROOT_DIR, scriptToRunRelativePath)
+                exec = 'npx'
+                /** 
+                 * npm run playwright.script1 --  --sldxenv=fdalbo --ui 
+                 * minimist gives --ui=true and we want --ui
+                 */
+                notEnvVarsArguments = notEnvVarsArguments.map((x) => x.startsWith('--ui') ? '--ui' : x)
+                childProcessArgs = ['playwright', 'test', scriptToRunRelativePath, ...notEnvVarsArguments]
                 break
             default:
-                throw new Error(`Unexpected runner command [${options.command}] Expected[${_expectedCommands.join(',')}]`)
+                throw new Error(`Unexpected runner command [${options.exec}] Expected[${_expectedCommands.join(',')}]`)
         }
-        if (!fs.existsSync(scriptFullPath)) {
-            throw new Error(`Script file not found\n${scriptFullPath}`)
+        const command = `${exec} ${childProcessArgs.join(' ')}`
+        if (!fs.existsSync(scriptToRunFullPath)) {
+            throw new Error(`Command[${command}] - Script file not found\n${scriptToRunFullPath}`)
         }
-        myConsole.lowlight(`\nCommand:\n- ${command}\nScript file path:\n- ${scriptFullPath}\nprocess.execPath:\n- ${process.execPath}`)
+        myConsole.highlight(`COMMAND: '${command}'`)
         /** RUN SCRIPT -Execute the script in a child process */
-        const scriptName = path.basename(scriptFullPath)
-        let runErr = false
+        const scriptName = path.basename(scriptToRunFullPath)
         process.env.SLDX_RUNNER_SCRIPT_NAME = scriptName
+        /** node, artillery, playwright */
+        process.env.SLDX_RUNNER_EXEC = options.exec
         try {
-            myConsole.superhighlight(`Run ${command} ${scriptName} BEGIN`)
             const modeShell = os.platform() == 'linux'
             //execa.execaSync(process.execPath, childProcessArgs, {
-            execa.sync(command, childProcessArgs, {
+            execa.sync(exec, childProcessArgs, {
                 stdio: [process.stdin, process.stdout, process.stderr],
                 /** Environment variables are passed to the child process by default */
                 env: process.env,
@@ -100,13 +148,12 @@ module.exports = async function (scriptRelativePath, additionalEnvVars, options)
              */
             myConsole.error(`Run ${command} ${scriptName} ERROR\n`, e)
             runErr = true
-        } finally {
-            myConsole.superhighlight(`Run ${command} ${scriptName} END ${runErr ? 'KO' : 'Ok'}\n`)
         }
     } catch (e) {
         myConsole.error("RUNNER ERROR", e)
+        runErr = true
     } finally {
-        myConsole.superhighlight('RUNNER: END\n')
+        myConsole.superhighlight(`RUNNER: END ${runErr ? 'KO' : 'Ok'}\n`)
         await pause(500)
     }
 }

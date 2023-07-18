@@ -124,7 +124,7 @@ const _Console = function () {
      * call initLoggerFromModule(import.meta js) from the js file
      * @param {string} import_meta provided by import.meta js file for esm ou __filename for commonjs
      */
-    this.initLoggerFromModule = async (import_meta) => {
+    this.initLoggerFromModule = (import_meta, opts) => {
         /** 
          * with esm  initLoggerFromModule(import.meta)
          *      import  { filename as filenameEsm } from 'dirname-filename-esm'
@@ -132,7 +132,7 @@ const _Console = function () {
          * with commonjs  initLoggerFromModule(__filename)
          *       this.initLogger(path.basename(import_meta, '.js'))
          */
-        this.initLogger(path.basename(import_meta, '.js'))
+        this.initLogger(path.basename(import_meta, '.js'), opts)
     }
 
     /** opts: {
@@ -143,27 +143,31 @@ const _Console = function () {
      * } 
      */
     this.initLogger = (logFileName, opts) => {
-        if (!process.env.SLDX_LOG_DIR) {
-            this.warning(`Can't create qsConsolelogger [${logFileName}] - Process.env.SLDX_LOG_DIR is empty`)
+        opts = Object.assign({
+            /** force log dir */
+            logDirPath: process.env.SLDX_LOG_DIR_PATH
+        }, opts?? {})
+        if (_.isEmpty(opts.logDirPath)) {
+            this.warning(`Can't create qsConsolelogger [${logFileName}] - Process.env.SLDX_LOG_DIR_PATH is empty`)
             return
         }
-        if (!fs.existsSync(process.env.SLDX_LOG_DIR)) {
-            this.warning(`Can't create qsConsolelogger  [${logFileName}] - Folder '${process.env.SLDX_LOG_DIR}' not found`)
+        if (!fs.existsSync(opts.logDirPath)) {
+            this.warning(`Can't create qsConsolelogger  [${logFileName}] - Folder '${opts.logDirPath}' not found`)
             return
         }
         logFileName ??= `myConsole.${process.id}`
         if (!logFileName.endsWith('.log')) {
             logFileName = `${logFileName}.log`
         }
-        const logFilePath = path.resolve(process.env.SLDX_LOG_DIR, logFileName)
+        const logFilePath = path.resolve(opts.logDirPath, logFileName)
         _currentLogger = createLogger(logFilePath, this, opts)
         loggerStack.push(_currentLogger)
     }
 
-    this.closeLogger = async () => {
+    this.closeLogger = () => {
         if (_currentLogger) {
             console.log('closeLogger', _currentLogger.filePath)
-            await _currentLogger.close()
+            _currentLogger.close()
         }
         console.log('closeLogger end')
         loggerStack = loggerStack.filter(l => l != _currentLogger)
@@ -179,17 +183,17 @@ const _Console = function () {
      * @param blockName Block's name without @log(..) info
      * @returns promise
      */
-    this.jestPushLogger = async (loggerName, jestBlockName) => {
+    this.jestPushLogger = (loggerName, jestBlockName) => {
         if (_.isEmpty(loggerName) || _.isEmpty(jestBlockName)) {
             return
         }
-        await this.initLogger(loggerName, {
+        this.initLogger(loggerName, {
             jestBlockName: jestBlockName
         })
         const message = `Process: ${process.pid} - QSConsole.pushLogger - Blockname '${jestBlockName}'\n\tCurrentLogger: ${_currentLogger?.opts?.jestBlockName ?? 'Aucun'}\n`
         this.loggerAll(message)
     }
-    this.jestPopLogger = async (jestBlockName) => {
+    this.jestPopLogger = (jestBlockName) => {
         if (loggerStack.length == 0) {
             return
         }

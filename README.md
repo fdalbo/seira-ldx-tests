@@ -13,3 +13,5 @@
 ```
 ## Run playwright
 ```npx playwright test ./_playwright/tests/test.seira.spec.ts```
+## Run playwright
+```npx playwright codegen http://localhost:2020/client```

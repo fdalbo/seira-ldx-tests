@@ -7,7 +7,7 @@ const winston = require('winston')
 const { checkParentPath } = require('./utils')
 const { rimraf } = require('rimraf')
 const { isMainThread, threadId } = require('worker_threads')
-const { getValues: envVarsGetValues } = require('#env/defaultEnvVars')
+const { getEnvValues } = require('#env/defaultEnvVars')
 
 const _myFormat = winston.format.printf(({ level, message, timestamp }) => {
     return `${timestamp} ${message}`
@@ -86,18 +86,18 @@ class Logger {
     all(message, ...splatArgs) {
         this.#myLogger && this.#myLogger.log.apply(this.#myLogger, ['error', `${_threadPrefix}${message}`, ...splatArgs])
     }
-    async close() {
-        this.#myLogger && this.#myLogger.clear()
+    close() {
+        this.#myLogger && this.#myLogger.close()
     }
 
 }
 
-module.exports = function (logFilePath, myConsole, opts) {
+module.exports = function createLogger (logFilePath, myConsole, opts) {
     const myLogger = new Logger(path.resolve(logFilePath), opts)
     myLogger.info(`INIT ${new Date().toDateString()}`)
     myLogger.info(`process.pid='${process.pid}' - process.ppid='${process.ppid}' - ${isMainThread ? 'main-thread' : `Worker-thread=${threadId}`}`)
     /** filter env variables for unit tests (env variables are not set) */
-    myLogger.info(`Default env vars:\n${envVarsGetValues().filter(x => !_.isEmpty(x.value)).map(x => `- ${x.name}='${x.value}'`).join('\n')}`)
+    myLogger.info(`Default env vars:\n${getEnvValues().filter(x => !_.isEmpty(x.value)).map(x => `- ${x.name}='${x.value}'`).join('\n')}`)
     myConsole && myConsole.lowlight(`Creates myLogger '${myLogger.name}' - Level: '${myLogger.level}'\n- ${myLogger.filePath}\n`)
     return myLogger
 }
