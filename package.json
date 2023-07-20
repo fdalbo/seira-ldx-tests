@@ -26,6 +26,7 @@
     "chalk": "~4.1",
     "clone": "~2.1.2",
     "dateformat": "~4.6",
+    "deepmerge": "^4.3.1",
     "dirname-filename-esm": "~1.1.1",
     "dotenv": "~16.3.1",
     "escape-string-regexp": "~5.0.0",

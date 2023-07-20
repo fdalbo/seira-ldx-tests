@@ -10,7 +10,7 @@ const execa = require('execa')
 const myConsole = require('#commons/myConsole')
 const { pause } = require('#commons/promises')
 const { ARGS_PREFIX, readSldxEnv, readProccessArgument } = require('#env/defaultEnvVars')
-const initEnvVars = require('#env/initEnvVars')
+const { traceVariables, initEnvVars } = require('#env/initEnvVars')
 const appRootDir = require('app-root-dir')
 const os = require('os')
 const dotenv = require('dotenv')
@@ -50,8 +50,10 @@ const _init = (mainScriptPath, additionalEnvVars) => {
         throw new Error(`Expected env file path [${dotEnvFilePath}] not found`)
     }
     myConsole.highlight(`Init environment variables\ndotEnvFilePath [${dotEnvFilePath}]`)
-    const notEnvVarsArguments = initEnvVars(additionalEnvVars, {
-        dotenvpath: dotEnvFilePath
+    const { notEnvVarsArguments, environmentVariables } = initEnvVars(additionalEnvVars, {
+        dotenvpath: dotEnvFilePath,
+        /** trace just before execa() */
+        traceVariables: false
     })
     const _myArgs = readProccessArgument()
     if ((process.argv.length - _myArgs.size) == 2) {
@@ -62,9 +64,19 @@ const _init = (mainScriptPath, additionalEnvVars) => {
         process.exit(0)
         /** END */
     }
-    return notEnvVarsArguments
+    return { notEnvVarsArguments, environmentVariables }
 }
 
+const _setRunnerEnvVar = (environmentVariables, name, value) => {
+    const envVar = environmentVariables.find(x => x.name === name)
+    if (!envVar) {
+        myConsole.warning(`Runer env variable not found [${name}][${value}]`)
+        return
+    }
+    envVar.value = value ?? ''
+    envVar.source = 'runner'
+    process.env[name] = value
+}
 /**
  *  
  * @param {*} mainScriptPath    given by caller's __filename 
@@ -77,7 +89,7 @@ module.exports = async function (mainScriptPath, additionalEnvVars, options) {
         /**
          * notEnvVarsArguments: arguments tat 
          */
-        let notEnvVarsArguments = _init(mainScriptPath, additionalEnvVars)
+        let { notEnvVarsArguments, environmentVariables } = _init(mainScriptPath, additionalEnvVars)
         const scriptToRunRelativePath = process.argv[2]
         myConsole.superhighlight(`RUNNER: BEGIN - Process: ${process.pid}`)
         options = Object.assign({}, {
@@ -102,9 +114,11 @@ module.exports = async function (mainScriptPath, additionalEnvVars, options) {
                 exec = 'npx'
                 /** 
                  * npm run playwright.script1 --  --sldxenv=fdalbo --ui 
-                 * minimist gives --ui=true and we want --ui
+                 * minimist gives --ui=true and we want --ui idem for --debug
                  */
-                notEnvVarsArguments = notEnvVarsArguments.map((x) => x.startsWith('--ui') ? '--ui' : x)
+                notEnvVarsArguments = notEnvVarsArguments.map((x) => x.startsWith('--') ? x.split('=')[0] : x)
+                _setRunnerEnvVar(environmentVariables, 'SLDX_PLAYWRIGTH_UI', `${notEnvVarsArguments.includes('--ui')}`)
+                _setRunnerEnvVar(environmentVariables, 'SLDX_PLAYWRIGTH_DEBUG', `${notEnvVarsArguments.includes('--debug')}`)
                 childProcessArgs = ['playwright', 'test', scriptToRunRelativePath, ...notEnvVarsArguments]
                 break
             default:
@@ -115,15 +129,17 @@ module.exports = async function (mainScriptPath, additionalEnvVars, options) {
             throw new Error(`Command[${command}] - Script file not found\n${scriptToRunFullPath}`)
         }
         myConsole.highlight(`COMMAND: '${command}'`)
-        /** RUN SCRIPT -Execute the script in a child process */
+        /** RUN SCRIPT - Execute the script in a child process */
         const scriptName = path.basename(scriptToRunFullPath)
-        process.env.SLDX_RUNNER_SCRIPT_NAME = scriptName
+        _setRunnerEnvVar(environmentVariables, 'SLDX_RUNNER_SCRIPT_NAME', scriptName)
         /** node, artillery, playwright */
-        process.env.SLDX_RUNNER_EXEC = options.exec
+        _setRunnerEnvVar(environmentVariables, 'SLDX_RUNNER_EXEC', options.exec)
         try {
+            /** ALl variables befroe running the command */
+            traceVariables(environmentVariables)
             const modeShell = os.platform() == 'linux'
             //execa.execaSync(process.execPath, childProcessArgs, {
-            execa.sync(exec, childProcessArgs, {
+            const { stdout, stderr } = await execa(exec, childProcessArgs, {
                 stdio: [process.stdin, process.stdout, process.stderr],
                 /** Environment variables are passed to the child process by default */
                 env: process.env,

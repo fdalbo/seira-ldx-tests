@@ -47,7 +47,7 @@ module.exports = defineConfig({
   globalTeardown: require.resolve('./global-teardown'),
 
   // Each test is given 30 seconds.
-  timeout: 30000,
+  timeout: 10 * 60 * 60 * 1000,
 
   /* Run your local dev server before starting the tests */
   // webServer: {

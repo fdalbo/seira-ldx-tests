@@ -14,7 +14,7 @@ const chalk = require('chalk')
 /** absolute path to avoid .js extension*/
 const { appendToDefaultVars, ARGS_PREFIX } = require('#env/defaultEnvVars')
 
-const _traceVariables = (vars) => {
+module.exports.traceVariables = (vars) => {
     const traceEnvs = []
     for (const envVar of vars) {
         let text
@@ -38,62 +38,29 @@ const _resolveRootPath = (filepath) => {
 
 /**
  * Overrides environmentVariables values with the ones comming from dotenv file
- * @param {sting} optionsPath 
- * --> dotenv file path comes from runner options.dotenvpath parameter
- * @param {sting} argsPath
- * --> dotenv file path comes from sript --dotenvpath argument 
- * @param {array} environmentVariables 
+ * --> dotenv file path 
+ * @param {array} dotenvpath 
  */
-const _initVarsFromDotenv = (optionsPath, argsPath, environmentVariables) => {
-    let dotenvpath = null
-    let dotenvsource = null
-    dotenvpath = optionsPath
-    let dotenvExpected = false
-    if (dotenvpath) {
-        /** A/ .env path given by runner options.dotenvpath*/
-        dotenvpath = _resolveRootPath(optionsPath)
-        dotenvsource = 'runner options.dotenvpath parameter'
-        dotenvExpected = true
-    } else {
-        dotenvpath = argsPath
-        if (dotenvpath) {
-            /** B/ .env path given by --dotenvpath argument*/
-            dotenvpath = _resolveRootPath(dotenvpath)
-            dotenvsource = 'script --dotenvpath argument'
-            dotenvExpected = true
-        } else {
-            /** C/ regular .env path that the root of the project */
-            dotenvpath = path.resolve(process.cwd(), '.env')
-            dotenvsource = 'regular .env path'
-        }
-    }
-    /** dotenv file needed - override  */
-    if (fs.existsSync(dotenvpath)) {
-        /** Load  dotenv.config and overrides the process.env variables*/
-        const dotenvConfig = (dotenv.config({ path: dotenvpath }) ?? {}).parsed ?? {}
-        const dotenvEntries = Object.entries(dotenvConfig)
-        if (dotenvEntries.length > 0) {
-            for (const [key, value] of dotenvEntries) {
-                const strValue = (value ?? '').toString()
-                /** .env file contains name=value  */
-                let envVar = environmentVariables.find(x => x.name === key)
-                if (envVar == null) {
-                    envVar = {
-                        name: key
-                    }
-                    environmentVariables.push(envVar)
+const _initVarsFromDotenv = (dotenvpath, environmentVariables) => {
+    /** Load  dotenv.config and overrides the process.env variables*/
+    const dotenvConfig = (dotenv.config({ path: dotenvpath }) ?? {}).parsed ?? {}
+    const dotenvEntries = Object.entries(dotenvConfig)
+    if (dotenvEntries.length > 0) {
+        for (const [key, value] of dotenvEntries) {
+            const strValue = (value ?? '').toString()
+            /** .env file contains name=value  */
+            let envVar = environmentVariables.find(x => x.name === key)
+            if (envVar == null) {
+                envVar = {
+                    name: key
                 }
-                envVar.value = strValue
-                envVar.source = 'dotenv'
+                environmentVariables.push(envVar)
             }
-        } else {
-            myConsole.lowlight(`dotenv file is empty`)
+            envVar.value = strValue
+            envVar.source = 'dotenv'
         }
-    } else if (dotenvExpected === true) {
-        myConsole.error(`dotenv file not found from '${dotenvsource}'\n- '${dotenvpath}'`)
-        process.exit()
     } else {
-        myConsole.lowlight('dot env file not found')
+        myConsole.lowlight(`dotenv file is empty`)
     }
 }
 
@@ -115,8 +82,11 @@ const _initVarsFromDotenv = (optionsPath, argsPath, environmentVariables) => {
  * --> Array that contains the aruments that are not environment variables
  * --> These arguments are passed to the chile process (see runner.js)
  */
-module.exports = function initEnvVars(additionalEnvVars, options) {
-    options ??= {}
+module.exports.initEnvVars = (additionalEnvVars, options) => {
+    options = Object.assign({
+        dotenvpath: null,
+        traceVariables: true
+    }, options ?? {})
     additionalEnvVars ??= []
     /** 
      * DEFAULT ENV-VARS READ FROM defaultEnvVars
@@ -135,9 +105,36 @@ module.exports = function initEnvVars(additionalEnvVars, options) {
         string: environmentVariables.filter(x => x.type === 'string' && x.arg).map(x => x.arg),
         boolean: environmentVariables.filter(x => x.type === 'boolean' && x.arg).map(x => x.arg)
     }
-    const parsedArguments = parseArguments(process.argv.slice(2), minimistOpts)
     /** OVERRIDES ENV-VARS WITH DOTENV FILE IF ANY */
-    _initVarsFromDotenv(options.dotenvpath, parsedArguments['dotenvpath'], environmentVariables)
+    const parsedArguments = parseArguments(process.argv.slice(2), minimistOpts)
+    let dotenvpath, dotenvsource, dotenvExpected = false
+    if (options.dotenvpath) {
+        /** A/ .env path given by runner options.dotenvpath*/
+        dotenvpath = _resolveRootPath(options.dotenvpath)
+        dotenvsource = 'runner options.dotenvpath parameter'
+        dotenvExpected = true
+    } else {
+        dotenvpath = parsedArguments['dotenvpath']
+        if (dotenvpath) {
+            /** B/ .env path given by --dotenvpath argument*/
+            dotenvpath = _resolveRootPath(dotenvpath)
+            dotenvsource = 'script --dotenvpath argument'
+            dotenvExpected = true
+        } else {
+            /** regular .env store at the root of the project */
+            dotenvpath = path.resolve(process.cwd(), '.env')
+            dotenvsource = 'regular .env path'
+        }
+    }
+    /** dotenv file needed - override  */
+    if (fs.existsSync(dotenvpath)) {
+        _initVarsFromDotenv(dotenvpath, environmentVariables)
+    } else if (dotenvExpected === true) {
+        myConsole.error(`dotenv file not found from '${dotenvsource}'\n- '${dotenvpath}'`)
+        process.exit()
+    } else {
+        myConsole.lowlight('dot env file not found')
+    }
     const notEnvVarsArguments = []
     /** OVERRIDES ENV-VARS WITH PROCESS ARGUMENTS IF ANY  */
     for (const [key, value] of Object.entries(parsedArguments)) {
@@ -238,7 +235,8 @@ module.exports = function initEnvVars(additionalEnvVars, options) {
 
     environmentVariables.sort((a, b) => a.name.localeCompare(b.name))
 
-    _traceVariables(environmentVariables)
-
-    return notEnvVarsArguments
+    if (options.traceVariables === true) {
+        module.exports.traceVariables(environmentVariables)
+    }
+    return { environmentVariables, notEnvVarsArguments }
 }

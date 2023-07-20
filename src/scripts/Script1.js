@@ -1,51 +1,62 @@
 
-const {ScriptRunner} = require('./ScriptRunner')
+const { ScriptRunner } = require('./ScriptRunner')
 
-class _Script1 extends ScriptRunner {
+module.exports = class Script1 extends ScriptRunner {
   async afterLogin() {
     await super.afterLogin()
-    await this.clickBySelector('#learner')
-    await this.clickLink('Toutes mes sessions')
-    await this.clickText('testperfs')
-    /** Démarrer / Poursuivre */
-    await this.clickBySelector('button.start-button-cta')
-    await this.clickButton('SUIVANT')
-    await this.clickButton('SUIVANT')
-    await this.clickButton('Précédent')
-    await this.clickButton('Précédent')
-    /** Page d'accueil */
-    await this.clickButton('SUIVANT')
+    /** 
+     * Page is 'Apprenant homme page' 
+     * Progression is 0%
+     */
+    await this.clickSessionsApprenant()
+    await this.clickSelectSessionApprenant()
+    /** Démarrer */
+    await this.clickDemarrerParcours()
+    await this.clickNextCard()
+    await this.clickNextCard()
+    await this.clickNextCard()
+    await this.clickNextCard()
+    await this.clickNextCard()
+    await this.clickModalCancel()
+    await this.clickPrevCard()
+    await this.clickPrevCard()
+    await this.clickPrevCard()
+    await this.clickPrevCard()
     /** pdf */
-    await this.clickButton('SUIVANT')
+    await this.clickNextCard()
     /** video */
-    await this.clickButton('SUIVANT')
+    await this.clickNextCard()
     /** audio */
-    await this.clickButton('SUIVANT')
-    /** quiz */
-    await this.clickButton('SUIVANT')
+    await this.clickNextCard()
+    /** card attention!! */
+    await this.clickNextCard()
+    /** Etes vous sur de vouloir de démarrer ? */
+    await this.clickNextCard()
     /** Dialog */
-    await this.clickButton('Ok')
-    /** First quiz */
-    await this.clickBySelector('mat-radio-button:nth-child(2)')
-    await this.clickButton('SUIVANT')
+    await this.clickModalOK()
+    /** First quiz 3 radios */
+    for (let i = 1; i < this.scenario.nbLoopQuiz1; i++) {
+      await this.clickRadio(i % 3 + 1)
+    }
+    await this.clickNextCard()
     /** Second quiz */
-    await this.clickBySelector('mat-radio-button:nth-child(2)')
-    await this.clickButton('SUIVANT')
+    for (let i = 1; i < this.scenario.nbLoopQuiz2; i++) {
+      await this.clickRadio(i % 3 + 1)
+    }
     /** Third quiz */
-    await this.clickBySelector('mat-checkbox:nth-child(2)')
-    await this.clickBySelector('mat-checkbox:nth-child(4)')
-    await this.clickButton('SUIVANT')
-    /** Quiz terminé */
-    await this.clickButton('SUIVANT')
-    /** Parcours complété */
-    await this.clickButton('SUIVANT')
-    /** Feedback personnalisé */
-    await this.clickButton('SUIVANT')
-    /** Page de fin */
-    await this.clickButton('SUIVANT')
-    /** Page de fin */
-    await this.clickButton('SUIVANT')
+    await this.clickNextCard()
+    for (let i = 1; i < this.scenario.nbLoopQuiz3; i++) {
+      await this.clickCheckBox(i % 4 + 1)
+    }
+    /** Quiz end */
+    await this.clickNextCard()
+    /** career completed */
+    await this.clickNextCard()
+    /** Feedback */
+    await this.clickNextCard()
+    await this.clickNextCard()
+    await this.clickNextCard()
+    /** Landing page */
+    await this.clickNextCard()
   }
 }
-
-module.exports = _Script1

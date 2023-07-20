@@ -110,6 +110,7 @@ const DEFAULT_VARS = [
     }, {
         name: 'SLDX_PROXY_URL',
         allowEmpty: true,
+        source: 'calculated',
         /* calculated */
         value: '',
         highlight: true
@@ -131,21 +132,38 @@ const DEFAULT_VARS = [
     }, {
         name: 'SLDX_USER_PWD',
         value: 'seira'
-    }, {
-        /* calculated by runner node, playwright, artillery*/
+    },
+    /* calculated by runner node, playwright, artillery*/
+    {
         name: 'SLDX_RUNNER_EXEC',
+        source: 'calculated',
         allowEmpty: true,
         value: ''
     }, {
-        /** calculated by runner */
         name: 'SLDX_RUNNER_SCRIPT_NAME',
+        source: 'calculated',
         allowEmpty: true,
         value: ''
     }, {
         name: 'SLDX_PLAYWRIGHT_USER',
+        source: 'calculated',
         allowEmpty: true,
         arg: `${_ARGS_PREFIX}pwuser`,
         value: ''
+    }, {
+        name: 'SLDX_PLAYWRIGTH_UI',
+        source: 'calculated',
+        allowEmpty: true,
+        value: ''
+    }, {
+        name: 'SLDX_PLAYWRIGTH_DEBUG',
+        source: 'calculated',
+        allowEmpty: true,
+        value: ''
+    }, {
+        name: 'SLDX_PLAYWRIGTH_SCRIPT_TIMEOUT',
+        type: 'numeric',
+        value: new Number(10 * 60 * 60 * 1000).toString()
     }
 ]
 

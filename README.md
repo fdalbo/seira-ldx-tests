@@ -1,4 +1,9 @@
 
+
+## Install
+[artillery](https://www.artillery.io/docs/get-started/get-artillery)
+[playwright](https://playwright.dev/docs/intro)
+
 ## Launch server
 ```osascript dev_scripts/start_full_project/mac.scpt```
 ## npm
@@ -15,3 +20,8 @@
 ```npx playwright test ./_playwright/tests/test.seira.spec.ts```
 ## Run playwright
 ```npx playwright codegen http://localhost:2020/client```
+
+npm run artillery.script1 -- --sldxenv=fdalbo
+npm run playwright.script1 --  --sldxenv=fdalbo --sldxpwuser=user3
+npm run playwright.script1 --  --sldxenv=fdalbo --sldxpwuser=user1 --debug
+npm run playwright.script1 --  --sldxenv=fdalbo --sldxpwuser=user1 --ui
