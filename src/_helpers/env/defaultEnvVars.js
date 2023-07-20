@@ -5,6 +5,7 @@ const _ = require('lodash')
 const _ARGS_PREFIX = 'sldx'
 module.exports.ARGS_PREFIX = _ARGS_PREFIX
 const _SLDX_ENV_VAR = 'SLDX_ENV'
+module.exports.SLDX_ENV_VAR = _SLDX_ENV_VAR
 /** -- --sldxenv=xxx */
 const _SLDX_ENV_ARG = `${_ARGS_PREFIX}env`
 const DEFAULT_VARS = [
@@ -14,16 +15,6 @@ const DEFAULT_VARS = [
         value: 'local',
         highlight: true,
         arg: _SLDX_ENV_ARG
-    }, {
-        name: 'SLX_ARTILLERY_ROOT_DIR',
-        highlight: true,
-        dirPath: true,
-        value: './artillery',
-    }, {
-        name: 'SLX_PLAYWRIGHT_ROOT_DIR',
-        dirPath: true,
-        highlight: true,
-        value: './playwright',
     }, {
         /** false doesn't trace http Req/Resp and myConsole.trace() in the console (only in log file)*/
         name: 'SLDX_TRACE_CONSOLE',
@@ -132,6 +123,25 @@ const DEFAULT_VARS = [
     }, {
         name: 'SLDX_USER_PWD',
         value: 'seira'
+    }, {
+        name: 'SLX_ARTILLERY_ROOT_DIR',
+        highlight: true,
+        dirPath: true,
+        value: './artillery',
+    }, {
+        name: 'SLX_ARTILLERY_REPORT_SUFFIX',
+        allowEmpty: true,
+        /**
+         * allow empty , string, $date, $day
+         * $date: 'yyyy-mm-dd-HH-MM-ss'
+         * $day:  'yyyy-mm-dd'
+         */
+        value: '$day',
+    }, {
+        name: 'SLX_PLAYWRIGHT_ROOT_DIR',
+        dirPath: true,
+        highlight: true,
+        value: './playwright',
     },
     /* calculated by runner node, playwright, artillery*/
     {
@@ -248,9 +258,9 @@ module.exports.readSldxEnv = function (myConsole) {
     const myArgs = module.exports.readProccessArgument()
     if (myArgs.has(_SLDX_ENV_ARG)) {
         process.env[_SLDX_ENV_VAR] = myArgs.get(_SLDX_ENV_ARG)
-        myConsole.lowlight(`${_SLDX_ENV_VAR}='${process.env[_SLDX_ENV_VAR]}' read from --${_SLDX_ENV_ARG} argument`)
+        myConsole.highlight(`${_SLDX_ENV_VAR}='${process.env[_SLDX_ENV_VAR]}' read from --${_SLDX_ENV_ARG} argument`)
     } else if (process.env[_SLDX_ENV_VAR].length > 0) {
-        myConsole.lowlight(`${_SLDX_ENV_VAR}='${process.env[_SLDX_ENV_VAR]}' read from .env file`)
+        myConsole.highlight(`${_SLDX_ENV_VAR}='${process.env[_SLDX_ENV_VAR]}' read from .env file`)
     }
     if (process.env[_SLDX_ENV_VAR].trim().length == 0) {
         throw new Error(`Unexpected empty variable ${_SLDX_ENV_VAR}`)

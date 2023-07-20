@@ -1,9 +1,0 @@
-SLDX_LOG_LEVEL = 'debug'
-SLDX_LOG_DIR_PATH = './logs/$host/$day/tests'
-SLDX_WORK_DIR_PATH = './workdir/$host/$day/tests'
-SLDX_PROXY_PROTOCOL = 'https'
-SLDX_PROXY_HOST = 'preprod.preprod.seira-ldx.fr'
-SLDX_PROXY_PORT= ''
-SLDX_ADMIN_USER = 'admin'
-SLDX_ADMIN_PASSWORD = 'admin'
-

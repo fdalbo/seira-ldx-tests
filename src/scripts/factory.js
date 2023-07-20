@@ -1,5 +1,6 @@
 
 const myConsole = require('#commons/myConsole')
+const _ = require('lodash')
 const _classes = [
     require('./Script1')
 ]
@@ -17,6 +18,10 @@ module.exports.runScript = async (className, scriptFilePath, pwPage) => {
     try {
         myConsole.superhighlight(`BEGIN RUN ${className}`)
         myConsole.lowlight(`From [${scriptFilePath}]`)
+        if (_.isEmpty(process.env.SLDX_RUNNER_EXEC)) {
+            myConsole.warning(`\n\nProcess must be launched by the runner\n- npm run artillery.script1 --  --sldxenv=playwright.debug\n- npm run playwright.script1 --  --sldxenv=playwright.debug --sldxpwuser=user4 --debug\n\n`)
+            throw new Error(`Process must be launched by the runner`)
+        }
         const klass = _classes.find(x => x.name === className)
         if (klass == null) {
             throw new Error(`Script Class [${className}] not found`)

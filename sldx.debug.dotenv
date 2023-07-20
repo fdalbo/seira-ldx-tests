@@ -6,4 +6,5 @@ SLDX_PROXY_HOST = 'localhost'
 SLDX_PROXY_PORT= '2020'
 SLDX_ADMIN_USER = 'admin'
 SLDX_ADMIN_PASSWORD = 'admin'
-
+# the user used by artillery will be user8 (7+1)
+SLDX_ARTILLERY_USER_FIRST_IDX = '7'

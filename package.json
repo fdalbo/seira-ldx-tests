@@ -10,7 +10,9 @@
   "scripts": {
     "displayEnVariables": "node runner.artillery.js",
     "artillery.script1": "node runner.artillery.js test-script1.yml",
-    "playwright.script1": "node runner.playwright.js script1.spec.js"
+    "artillery.script1.debug": "node runner.artillery.js test-script1-debug.yml --sldxenv=debug",
+    "playwright.script1": "node runner.playwright.js script1.spec.js",
+    "playwright.script1.debug": "node runner.playwright.js script1.spec.js --sldxenv=debug --debug"
   },
   "imports": {
     "#src/*": "./src/*.js",

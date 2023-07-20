@@ -4,16 +4,18 @@
  * Runs a script in a child process
  * Set the environment variables 
  */
-const fs = require('fs')
+const fs = require('fs-extra')
 const path = require('path')
 const execa = require('execa')
-const myConsole = require('#commons/myConsole')
-const { pause } = require('#commons/promises')
-const { ARGS_PREFIX, readSldxEnv, readProccessArgument } = require('#env/defaultEnvVars')
-const { traceVariables, initEnvVars } = require('#env/initEnvVars')
 const appRootDir = require('app-root-dir')
 const os = require('os')
 const dotenv = require('dotenv')
+const myConsole = require('#commons/myConsole')
+const _ = require('lodash')
+const dateFormat = require('dateformat')
+const { pause } = require('#commons/promises')
+const { ARGS_PREFIX, readSldxEnv, readProccessArgument } = require('#env/defaultEnvVars')
+const { traceVariables, initEnvVars } = require('#env/initEnvVars')
 
 /**
  * Node uncaughtException
@@ -24,6 +26,12 @@ process.on('uncaughtException', function (err) {
     setTimeout(() => process.exit(), 500)
 })
 
+const _replaceDateTags = (string) => {
+    string ??= ''
+    const date = dateFormat(new Date(), 'yyyy-mm-dd-HH-MM-ss')
+    const day = dateFormat(new Date(), 'yyyy-mm-dd')
+    return string.replaceAll('$date', date).replaceAll('$day', day)
+}
 
 const _init = (mainScriptPath, additionalEnvVars) => {
     additionalEnvVars ??= []
@@ -45,11 +53,13 @@ const _init = (mainScriptPath, additionalEnvVars) => {
      */
     const tests_env = readSldxEnv(myConsole)
     const dotEnvFileName = `${ARGS_PREFIX}.${tests_env}.dotenv`
-    const dotEnvFilePath = path.resolve(`./${dotEnvFileName}`)
+    let dotEnvFilePath = path.resolve(`./${dotEnvFileName}`)
     if (!fs.existsSync(dotEnvFilePath)) {
-        throw new Error(`Expected env file path [${dotEnvFilePath}] not found`)
+        myConsole.warning(`Expected env file path [${dotEnvFilePath}] not found`)
+        dotEnvFilePath = null
+    } else {
+        myConsole.highlight(`Init environment variables\ndotEnvFilePath [${dotEnvFilePath}]`)
     }
-    myConsole.highlight(`Init environment variables\ndotEnvFilePath [${dotEnvFilePath}]`)
     const { notEnvVarsArguments, environmentVariables } = initEnvVars(additionalEnvVars, {
         dotenvpath: dotEnvFilePath,
         /** trace just before execa() */
@@ -105,9 +115,14 @@ module.exports = async function (mainScriptPath, additionalEnvVars, options) {
                 childProcessArgs = ['--no-warnings', '--es-module-specifier-resolution=node', '--trace-warnings', scriptToRunFullPath, ...notEnvVarsArguments]
                 break
             case 'artillery':
+                const reportDir = path.resolve(appRootDir.get(), 'artillery-report')
+                fs.ensureDir(reportDir)
+                const reportName = [path.basename(scriptToRunRelativePath, '.yml'), _replaceDateTags(process.env.SLX_ARTILLERY_REPORT_SUFFIX ?? '')].filter(x => x.length != 0)
+                const reportPath = path.resolve(reportDir, `${reportName.join('-')}.json`)
+                myConsole.highlight(`Report [${reportPath}]`)
+                fs.removeSync(reportPath)
                 scriptToRunFullPath = path.resolve(process.env.SLX_ARTILLERY_ROOT_DIR, scriptToRunRelativePath)
-                myConsole.lowlight(`\nArtillery config:\n${fs.readFileSync(scriptToRunFullPath, { encoding: "utf8" })}\n`)
-                childProcessArgs = ['run', scriptToRunFullPath, ...notEnvVarsArguments]
+                childProcessArgs = ['run', '--output', reportPath, scriptToRunFullPath, ...notEnvVarsArguments]
                 break
             case 'playwright':
                 scriptToRunFullPath = path.resolve(process.env.SLX_PLAYWRIGHT_ROOT_DIR, scriptToRunRelativePath)
@@ -127,6 +142,9 @@ module.exports = async function (mainScriptPath, additionalEnvVars, options) {
         const command = `${exec} ${childProcessArgs.join(' ')}`
         if (!fs.existsSync(scriptToRunFullPath)) {
             throw new Error(`Command[${command}] - Script file not found\n${scriptToRunFullPath}`)
+        }
+        if (exec === 'artillery') {
+            myConsole.lowlight(`\nArtillery config:\n${fs.readFileSync(scriptToRunFullPath, { encoding: "utf8" })}\n`)
         }
         myConsole.highlight(`COMMAND: '${command}'`)
         /** RUN SCRIPT - Execute the script in a child process */

@@ -9,7 +9,7 @@ const parseArguments = require('minimist')
 const myConsole = require('#commons/myConsole')
 const appRootDir = require('app-root-dir')
 const fs = require('fs-extra')
-const dateFormat = require("dateformat")
+const dateFormat = require('dateformat')
 const chalk = require('chalk')
 /** absolute path to avoid .js extension*/
 const { appendToDefaultVars, ARGS_PREFIX } = require('#env/defaultEnvVars')
