@@ -42,8 +42,8 @@ const _baseConfig = {
         modal: 2000
     },
     timeouts: {
-        defaultNavigationTimeout: 1000,
-        defaultTimeout: 1000
+        defaultNavigationTimeout: 30 * 1000,
+        defaultTimeout: 30 * 1000
 
     },
     artillery: {

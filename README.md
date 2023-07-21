@@ -62,13 +62,32 @@
    - Lance le script avec N users (voir propriété ``phases``)
    - Dans chaque worker (sous-process) le user est calculé via le N° du worker (variable ``LOCAL_WORKER_ID``)
    -  ``user8 pour worker 8 LOCAL_WORKER_ID = '8'``
-- Commandes
+ - Commandes
    - ``npm run artillery.script1``
    - ``npm run artillery.script1.denbug ``
+ - **Report from .json file**
+   - ``artillery report ./artillery-report/test-script1-debug-2023-07-21-5users.json``
 - **Playwright**
  - ``playwright/script1.spec.js``
     - Lance le script avec un seul user dont le nom est donné par ``SLDX_PLAYWRIGHT_USER`` ou l'argument ``--sldxpwuser``
     - ```npm run playwright.script1.debug -- --sldxpwuser=user4 ```
     - ```npm run playwright.script1 -- --sldxpwuser=user4 ```
     - ```npm run playwright.script1 -- --sldxpwuser=user1 --ui``` ppour le mode UI interractif
+  
+ - **debuggage dans chromium**
+    - Lancer le scripts en mode debug
+    - Ouvrir la console JS dans chromium
+    - L'objet playwright permet d'effectuer les tests ``await playwright.locator('#leaner')``
+- **log scripts**
+ - environment variable dans ;e fichier xx.dotenv ``SLDX_LOG_DIR_PATH = './_logs/$host/$day/tests'``
+ - path pour le worker 5
+    - ``_logs/localhost/2023-07-21/tests/tests.50616.w005.log``
+ - Pour conserver les logs ``SLDX_LOG_DIR_REMOVE_FILES=true`` ou utiliser ``$date`` (``SLDX_LOG_DIR_PATH = './_logs/$host/$date/tests'``)
+- **log runner**
+ - ``runner.playwright.log``
+ - ``runner.artillery.log``
+- **screenshots si erreur playwright**
+ - ``_logs/localhost/2023-07-21/tests/screenshots``
+- **sMetrics©**
+ - ``_logs/localhost/2023-07-21/tests/screenshots``
 

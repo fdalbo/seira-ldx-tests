@@ -3,16 +3,16 @@ module.exports = {
 
     scenario:{
         sessionName: 'testperfs',
-        nbLoopQuiz1: 20,
-        nbLoopQuiz2: 20,
-        nbLoopQuiz3: 20
+        nbLoopQuiz1: 100,
+        nbLoopQuiz2: 100,
+        nbLoopQuiz3: 100
     },
     tempo: {
-        default: 1000,
-        page: 1000,
-        radioCheckbox: 1000,
-        cardDisplay: 1000,
-        textInput: 1000,
-        modal: 1000
+        default: 5000,
+        page: 10000,
+        radioCheckbox: 5000,
+        cardDisplay: 10000,
+        textInput: 5000,
+        modal: 5000
     },
 }

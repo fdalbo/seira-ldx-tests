@@ -4,6 +4,16 @@ const { pause } = require('#commons/promises')
 const path = require('path')
 const _ = require('lodash')
 const appRootDir = require('app-root-dir')
+const Stats = require('stats-incremental')
+const CSVStream = require('./CsvStream')
+const {
+    isMainThread,
+    parentPort: _workerParentPort,
+    workerData: _workerData,
+    threadId: _workertThreadId
+} = require('worker_threads')
+const _verbose = true
+const _sendToMainThread = false
 const {
     initConfig,
     ROLE_LEARNER,
@@ -13,7 +23,120 @@ const {
     TEMPO_TEXT_INPUT,
     TEMPO_MODAL
 } = require(`${appRootDir.get()}/config.base`)
+const _METRIC_CARDS = 'cards'
+const _METRIC_QUIZ = 'quiz'
+const _METRIC_NAV = 'navigation'
+const _METRICS = [_METRIC_CARDS, _METRIC_QUIZ, _METRIC_NAV]
+/** playwight role (getByRole) */
+const _PW_ROLE_LINK = 'link'
+const _PW_ROLE_BUTTON = 'button'
+/** internal type for tracing */
+const _TYPE_BUTTON = _PW_ROLE_BUTTON
+const _TYPE_PAGE = 'page'
+const _TYPE_TEXT_LINK = 'textLink'
+const _TYPE_MENU = 'menu'
+const _TYPE_INPUT = 'input'
+const _TYPE_LIST_ITEM = 'listitem'
 
+const _CLICKABLE = {
+    MENU: {
+        LEARNER: {
+            label: 'Apprenant',
+            selector: '#learner',
+            type: _TYPE_MENU,
+            tempo: TEMPO_PAGE,
+            metric: _METRIC_NAV
+        }
+    },
+    INPUTS: {
+        CHECKBOX: {
+            label: 'checkbox',
+            /** dynamic */
+            selector: null,
+            type: _TYPE_INPUT,
+            tempo: TEMPO_RADIO,
+            metric: _METRIC_QUIZ
+        },
+        RADIO: {
+            label: 'radio',
+            /** dynamic */
+            selector: null,
+            type: _TYPE_INPUT,
+            tempo: TEMPO_RADIO,
+            metric: _METRIC_QUIZ
+        }
+    },
+    PAGES: {
+        CLIENT: {
+            label: 'client',
+            type: _TYPE_PAGE,
+            path: '/client',
+            tempo: TEMPO_PAGE,
+            metric: _METRIC_NAV,
+        }
+    },
+    BUTTONS: {
+        CARDNEXT: {
+            label: 'SUIVANT',
+            tempo: TEMPO_CARD_DISPLAY,
+            metric: _METRIC_CARDS,
+            role: _PW_ROLE_BUTTON,
+            type: _TYPE_BUTTON
+        },
+        CARDPREV: {
+            label: 'Précédent',
+            tempo: TEMPO_CARD_DISPLAY,
+            metric: _METRIC_CARDS,
+            role: _PW_ROLE_BUTTON,
+            type: _TYPE_BUTTON
+        },
+        DEMARRER: {
+            label: 'démarrer',
+            metric: _METRIC_NAV,
+            role: _PW_ROLE_BUTTON,
+            type: _TYPE_BUTTON
+        },
+        MODALOK: {
+            label: 'Ok',
+            tempo: TEMPO_MODAL,
+            role: _PW_ROLE_BUTTON,
+            type: _TYPE_BUTTON
+        },
+        MODALCANCEL: {
+            label: 'Annuler',
+            tempo: TEMPO_MODAL,
+            role: _PW_ROLE_BUTTON,
+            type: _TYPE_BUTTON
+        },
+        CONNECTION: {
+            label: 'Connexion',
+            tempo: TEMPO_PAGE,
+            metric: _METRIC_NAV,
+            role: _PW_ROLE_BUTTON,
+            type: _TYPE_BUTTON
+        }
+    },
+    LINKS: {
+        MYSESSIONS: {
+            label: 'Toutes mes sessions',
+            role: _PW_ROLE_LINK,
+            metric: _METRIC_NAV,
+            tempo: TEMPO_PAGE,
+            type: _TYPE_TEXT_LINK
+        }
+
+    },
+    TEXTS: {
+        LIST: {
+            /** dynamic */
+            label: null,
+            metric: _METRIC_NAV,
+            tempo: TEMPO_PAGE,
+            type: _TYPE_LIST_ITEM
+        }
+
+    }
+}
 exports.ScriptRunner = class ScriptRunner {
     stepIdx = 0
     name = null
@@ -22,10 +145,13 @@ exports.ScriptRunner = class ScriptRunner {
     userId = null
     userRole = null
     scenario = null
+    errorIdx = 0
+    metrics = null
+    csvStream = null
     constructor(scriptFilePath, pwPage) {
+        this.log(`NEW ScriptRunner`)
         this.name = path.basename(scriptFilePath)
         this.pwPage = pwPage
-        myConsole.initLoggerFromModule(this.name)
         this.config = initConfig(this.className.toLowerCase())
         this.scenario = this.config.scenario ?? {}
         this.userId = this.config.getUserId()
@@ -34,6 +160,28 @@ exports.ScriptRunner = class ScriptRunner {
         pwPage.setDefaultNavigationTimeout(this.config.timeouts.defaultNavigationTimeout ?? 1000)
         /** seehttps://playwright.dev/docs/api/class-page#page-set-default-timeout */
         pwPage.setDefaultTimeout(this.config.timeouts.defaultTimeout ?? 1000)
+        this._initMetrics()
+    }
+    _initMetrics() {
+        /** Metric */
+        if (process.env.SLDX_METRICS_ENABLED == 'true') {
+            this.metrics = {
+                lastUpdate: null,
+                stats: {}
+            }
+            for (const metricId of _METRICS) {
+                this.metrics.stats[metricId] = Stats()
+            }
+            this.logHighlight(`Metrics are enabled [${_METRICS.join(',')}]`)
+            this.csvStream = new CSVStream({
+                headers: true,
+                override: true,
+                filePath: path.resolve(process.env.SLDX_METRICS_DIR_PATH, `${myConsole.threadId}-metrics.csv`),
+                writeProperties: ['value', 'n', 'min', 'max', 'mean', 'variance', 'label']
+            })
+        } else {
+            this.logHighlight(`Metrics are disabled (SLDX_METRICS_ENABLED!=true)`)
+        }
     }
     get className() {
         return this.constructor.name
@@ -53,6 +201,97 @@ exports.ScriptRunner = class ScriptRunner {
     pwPageId() {
         const url = new URL(`${this.pwPage.url()}?`)
         return url.pathname.substring(url.pathname.lastIndexOf('/'))
+    }
+    /**
+     * 
+     * @param {string} selector 
+     * @param {string} filename without extension
+     */
+    async saveScreenShot(selector, filename) {
+        try {
+            if (this.pwPage) {
+                const ssPath = path.resolve(process.env.SLDX_SCREENSHOTS_DIR_PATH, `${myConsole.threadId}${filename}.png`)
+                this.logHighlight(`Save screenshot [${ssPath}]`)
+                await this.pwPage.locator(selector).screenshot({
+                    animations: 'disabled',
+                    type: 'png',
+                    path: ssPath
+                })
+            }
+        } catch (e) {
+            myConsole.warning(`Error saving the screenshot`, e)
+        }
+    }
+    async throwError(message, throwError = true) {
+        this.errorIdx++
+        await this.saveScreenShot('body', `error_${this.errorIdx++}`)
+        if (throwError == true) {
+            throw new Error(message)
+        } else {
+            myConsole.error('A non-fatal error occured', new Error(message))
+        }
+    }
+    getStat(id) {
+        return this.metrics.stats[id]
+    }
+    async sendMetrics(stats, clickInfo, value) {
+        try {
+            if (!this.metrics || stats.n <= 0 || !this.csvStream) {
+                return
+            }
+            const data = {
+                type: 'METRICS',
+                id: clickInfo.metric,
+                emitter: myConsole.threadId,
+                data: {
+                    value: value,
+                    n: stats.n,
+                    min: stats.min,
+                    max: stats.max,
+                    mean: Math.floor(stats.mean),
+                    variance: Math.floor(stats.variance),
+                    label: `${clickInfo.type}.${clickInfo.label}`
+                }
+            }
+            _verbose && this.log(`sendMetrics: ${JSON.stringify(data, null, 2)}`)
+            if (!isMainThread && _sendToMainThread) {
+                _workerParentPort.postMessage(data)
+            }
+            this.csvStream.write(data.emitter, data.id, data.data)
+        } catch (e) {
+            myConsole.error('Error Sending metrics', e)
+        }
+    }
+    async updateMetric(clickInfo, elapsedMs) {
+        const metricId = clickInfo.metric
+        if (!this.metrics || !metricId) {
+            return
+        }
+        const stats = this.getStat(metricId)
+        if (!stats) {
+            myConsole.warning(`Metric id[${metricId}] not found`)
+            return
+        }
+        stats.update(elapsedMs)
+        _verbose && this.log(`updateMetric.${clickInfo.type}.${metricId} label[${clickInfo.label}] elapsedMs[${elapsedMs}] count[${stats.n}] mean[${stats.mean}]`)
+        await this.sendMetrics(stats, clickInfo, elapsedMs)
+    }
+    /**
+     * Calls callbackMethod
+     * update the metrics if any (clickInfo.metric)
+     * @param {plainObject} clickInfo 
+     * @param {number} tempo (optional tempo MS ) 
+     * @param {Object} callbackObj  (playwright locator, playwright page..)
+     * @param {function} callbackMethod (async method)
+     * @param  {...any} args  (args for callbackMethod)
+     */
+    async applyAndMesure(clickInfo, tempo, callbackObj, callbackMethod, ...args) {
+        _verbose && this.log(`click.${clickInfo.type}.${clickInfo.label}`)
+        const t0 = new Date().getTime()
+        await callbackMethod.apply(callbackObj, args)
+        const elapsedMs = new Date().getTime() - t0
+        await this.updateMetric(clickInfo, elapsedMs)
+        await this.tempo(tempo ?? clickInfo.tempo)
     }
     /**
      * Recommended method for selectors
@@ -79,36 +318,35 @@ exports.ScriptRunner = class ScriptRunner {
         tempo ??= this.config.tempo.default
         if (_.isString(tempo)) {
             if (!this.config.tempo[tempo]) {
-                throw new Error(`Config - Unknown cinfog.tempo[${tempo}]`)
+                this.throwError(`Config - Unknown cinfog.tempo[${tempo}]`)
             }
             tempo = this.config.tempo[tempo]
         }
         const tempoMs = parseInt(tempo)
         if (isNaN(tempoMs)) {
-            throw new Error(`Config - Bad 'tempo' value [${tempoMs}ms/${tempo}]`)
+            this.throwError(`Config - Bad 'tempo' value [${tempoMs}ms/${tempo}]`)
         }
-
+        this.log(`[${new String(this.stepIdx++).padStart(2, 0)}] threadId[${_workertThreadId}] page[${this.pwPageId()}] tempoMs[${tempoMs}]`)
         await pause(tempoMs);
-        this.log(`[${new String(this.stepIdx++).padStart(2, 0)}] ${this.pwPageId()}`)
     }
     async clickMenuApprenant(tempo) {
-        await this.clickBySelector('#learner', tempo)
+        await this.clickBySelector(_CLICKABLE.MENU.LEARNER, tempo)
     }
     async clickSessionsApprenant(tempo) {
-        await this.clickLink('Toutes mes sessions', tempo)
+        await this.clickByRole(_CLICKABLE.LINKS.MYSESSIONS, tempo)
     }
     async clickSelectSessionApprenant(tempo) {
         await this.clickList(this.scenario.sessionName, tempo)
     }
     async clickNextCard(tempo) {
-        await this.clickButtonCard(true, tempo)
+        await this.clickByRole(_CLICKABLE.BUTTONS.CARDNEXT, tempo)
+    }
+    async clickNextCardBeforeModal(tempo) {
+        tempo = 5000
+        await this.clickByRole(_CLICKABLE.BUTTONS.CARDNEXT, tempo)
     }
     async clickPrevCard(tempo) {
-        await this.clickButtonCard(false, tempo)
-    }
-    async clickButtonCard(next = true, tempo) {
-        tempo ??= TEMPO_CARD_DISPLAY
-        await this.clickButton(next === true ? 'SUIVANT' : 'Précédent', tempo)
+        await this.clickByRole(_CLICKABLE.BUTTONS.CARDPREV, tempo)
     }
     async clickDemarrerParcours(tempo) {
         const selectorPageDetailSession = 'button.start-button-cta  > .mat-button-wrapper > span'
@@ -120,103 +358,134 @@ exports.ScriptRunner = class ScriptRunner {
         let element = await this.selector(selectorPageDetailSession)
         let text = null
         if (element != null) {
-            myConsole.lowlight('Career starts from user session\'s page')
+            this.log('Career starts from user session\'s page')
             text = await element.innerHTML()
         } else {
             let element = await this.selector(selectorPageApprenant)
             if (element != null) {
-                myConsole.lowlight('Career starts from learner\' homre welcome session')
+                this.log('Career starts from learner\' homre welcome session')
                 text = await element.innerHTML()
             } else {
-                throw new Error(`Career starts form an unknownn page`)
+                this.throwError(`Career starts from an unknownn page`)
             }
         }
         if (text.toLowerCase() != 'démarrer') {
-            throw new Error(`User[${this.userId}] - Unexpected 'start career' button - Expected[démarrer] Got[${text}]`)
+            this.throwError(`User[${this.userId}] - Unexpected 'start career' button - Expected[démarrer] Got[${text}]`)
         }
-        await this.clickButton('démarrer', tempo)
+        await this.clickByRole(_CLICKABLE.BUTTONS.DEMARRER, tempo)
     }
     async fillLabel(label, value, tempo) {
-        tempo ??= TEMPO_TEXT_INPUT
         this.log(`fillLabel '${label}' [${value}]`)
         await this.pwPage.getByLabel(label).fill(value)
-        await this.tempo(tempo)
+        await this.tempo(tempo ?? TEMPO_TEXT_INPUT)
     }
-    async clickBySelector(selector, tempo) {
-        this.log(`clickBySelector '${selector}'`)
-        await this.locator(`${selector}`).click()
-        await this.tempo(tempo)
+    _checkClickInfo(clickInfo) {
+        if (!_.isPlainObject(clickInfo) || _.isEmpty(clickInfo.label) || _.isEmpty(clickInfo.type)) {
+            this.throwError(`_checkClickInfo expects an object with at least a label and a type - clickInfo[${clickInfo ? JSON.stringify(clickInfo, null, 2) : 'null'}]`)
+        }
+    }
+    _checkClickable(object, clickInfo) {
+        if (!object) {
+            this.throwError(`_checkClickable unexpected null object - clickInfo[${JSON.stringify(clickInfo, null, 2)}]`)
+        }
+        if (!object.click) {
+            this.throwError(`_checkClickable unexpected null object.click method - clickInfo[${JSON.stringify(clickInfo, null, 2)}]`)
+        }
+    }
+    async clickBySelector(clickInfo, tempo) {
+        this._checkClickInfo(clickInfo)
+        if (_.isEmpty(clickInfo.selector)) {
+            this.throwError(`clickBySelector: unexpected empty clickInfo.selector`)
+        }
+        _verbose && this.log(`clickBySelector '${clickInfo.selector}'`)
+        const locator = await this.locator(clickInfo.selector)
+        await this.clickByLocator(locator, clickInfo, tempo)
     }
     /**
      * @param {number} index 1 to n from top to bottom
      */
     async clickCheckBox(index, tempo) {
-        tempo ??= TEMPO_RADIO
-        await this.clickBySelector(`mat-checkbox:nth-child(${index})`, tempo)
+        const clickInfo = Object.assign({}, _CLICKABLE.INPUTS.CHECKBOX)
+        clickInfo.selector = `mat-checkbox:nth-child(${index})`
+        await this.clickBySelector(clickInfo, tempo)
     }
     /**
      * @param {number} index 1 to n from top to bottom
      */
     async clickRadio(index, tempo) {
-        tempo ??= TEMPO_RADIO
-        await this.clickBySelector(`mat-radio-button:nth-child(${index})`, tempo)
-    }
-    async clickButton(buttonName, tempo) {
-        await this.clickByRole('button', buttonName, tempo)
+        const clickInfo = Object.assign({}, _CLICKABLE.INPUTS.RADIO)
+        clickInfo.selector = `mat-radio-button:nth-child(${index})`
+        await this.clickBySelector(clickInfo, tempo)
     }
     async clickModalOK(tempo) {
-        tempo ??= TEMPO_MODAL
-        await this.clickButton('Ok', tempo)
+        await this.clickByRole(_CLICKABLE.BUTTONS.MODALOK, tempo)
     }
     async clickModalCancel(tempo) {
-        tempo ??= TEMPO_MODAL
-        await this.clickButton('Annuler', tempo)
+        await this.clickByRole(_CLICKABLE.BUTTONS.MODALCANCEL, tempo)
     }
-    async clickByRole(role, name, tempo) {
-        this.log(`clickByRole '${role}' '${name}'`)
-        await this.pwPage.getByRole(role, { name: name }).click()
-        await this.tempo(tempo)
+    async clickByRole(clickInfo, tempo = null) {
+        this._checkClickInfo(clickInfo)
+        if (!clickInfo.role) {
+            this.throwError(`clickByRole - clickInfo.role is empty`)
+        }
+        const locator = await this.pwPage.getByRole(clickInfo.role, { name: clickInfo.label })
+        await this.clickByLocator(locator, clickInfo, tempo)
     }
-    async clickLink(name, tempo) {
-        tempo ??= TEMPO_PAGE
-        await this.clickByRole('link', name, tempo)
+    async clickByLocator(locator, clickInfo, tempo) {
+        if (locator == null) {
+            this.throwError(`clickByLocator: unexpected null locator ${JSON.stringify(clickInfo)}`)
+        }
+        this._checkClickable(locator, clickInfo)
+        await this.applyAndMesure(clickInfo, tempo, locator, locator.click)
+    }
+    async clickByText(textInfo, tempo = null) {
+        this._checkClickInfo(textInfo)
+        const locator = await this.pwPage.getByText(textInfo.label)
+        await this.clickByLocator(locator, textInfo, tempo)
     }
     async clickList(text, tempo) {
-        tempo ??= TEMPO_PAGE
+        const textInfo = Object.assign({}, _CLICKABLE.TEXTS.LIST)
+        textInfo.label = text
         this.log(`clickList '${text}'`)
-        await this.pwPage.getByText(text).click();
-        await this.tempo(tempo)
-    }
-    async clickTile(title, tempo) {
-        tempo ??= TEMPO_PAGE
-        this.log(`clickTile ${title}`)
-        await this.pwPage.getByTitle(title).click();
-        await this.tempo(tempo)
+        await this.clickByText(textInfo, tempo)
     }
     async clickConnect(tempo) {
-        tempo ??= TEMPO_PAGE
-        await this.clickButton('Connexion', tempo)
+        await this.clickByRole(_CLICKABLE.BUTTONS.CONNECTION, tempo)
     }
-    log(...args) {
-        myConsole.lowlight.apply(myConsole, args)
+    async gotoPage(pageInfo, tempo) {
+        this._checkClickInfo(pageInfo)
+        if (!pageInfo.path) {
+            this.throwError(`gotoPage - pageInfo.path is empty`)
+        }
+        const url = this.fullUrl(pageInfo.path)
+        this.log(`gotoPage ${url}`)
+        await this.applyAndMesure(pageInfo, tempo, this.pwPage, this.pwPage.goto, url)
+    }
+    log(message) {
+        myConsole.lowlight.call(myConsole, `[${_workertThreadId} ]${message}`)
+    }
+    logHighlight(message) {
+        myConsole.highlight.call(myConsole, `[${_workertThreadId} ]${message}`)
     }
     async run() {
-        const traceEnv = []
-        for (const [key, value] of Object.entries(process.env)) {
-            (key == 'LOCAL_WORKER_ID' || key.startsWith('SLDX')) && traceEnv.push(`${key}=${value}`)
+        try {
+            const traceEnv = []
+            for (const [key, value] of Object.entries(process.env)) {
+                (key == 'LOCAL_WORKER_ID' || key.startsWith('SLDX')) && traceEnv.push(`${key}=${value}`)
+            }
+            this.log(`BEGIN RUN ${this.name}`)
+            this.log(`SLDX Variables:\n${traceEnv.sort().join('\n')}\n`)
+            await this.login()
+            await this.afterLogin()
+            await this.beforeEnd()
+        } finally {
+            this.log(`END RUN ${this.name}`)
+            this.csvStream && this.csvStream.destroy()
         }
-        this.log(`SLDX Variables:\n${traceEnv.join('\n')}\n`)
-        await this.login()
-        await this.afterLogin()
-        await this.beforeEnd()
     }
     async login(tempo) {
-        tempo ??= TEMPO_PAGE
-        myConsole.highlight(`login ${this.userId}/${this.config.getUserPwd()} [${this.userRole}]`)
-        const url = this.fullUrl('/client')
-        this.log(`gotoPage ${url}`)
-        await this.pwPage.goto(url)
-        await this.tempo(tempo)
+        this.logHighlight(`login ${this.userId}/${this.config.getUserPwd()} [${this.userRole}]`)
+        await this.gotoPage(_CLICKABLE.PAGES.CLIENT)
         await this.fillLabel('Veuillez entrer votre identifiant ou e-mail *', this.userId)
         await this.fillLabel('Mot de passe : *', this.config.getUserPwd())
         await this.clickConnect()
@@ -230,22 +499,22 @@ exports.ScriptRunner = class ScriptRunner {
          * Eg: npm run playwright.script1 --  --sldxenv=fdalbo --sldxpwuser=user3 --ui
          */
         if ((this.isArtillery() || !this.isPlayWrightUi()) && expectedPogress != sessionProgress) {
-            throw new Error(`unexpected session progression for user[${this.userId}] - Expected[${expectedPogress}] - Got[${sessionProgress}]`)
+            this.throwError(`unexpected session progression for user[${this.userId}] - Expected[${expectedPogress}] - Got[${sessionProgress}]`)
         }
     }
     async getSessionProgression() {
         const progress = await this.locator('app-progress-bar .percentage-progression').innerHTML()
-        myConsole.highlight(`Progession [${progress}]`)
+        this.logHighlight(`Progession [${progress}]`)
         return progress
     }
     async afterLogin() {
-        myConsole.highlight(`afterLogin`)
+        this.logHighlight(`afterLogin`)
         await this.clickMenuApprenant()
         if (this.userRole = ROLE_LEARNER) {
             await this.learnerCheckSatus()
         } else {
             /** In case we want to develop scenarri for other  user roles */
-            throw new Error(`Unexpected user role[${this.userId}.${this.userRole}] - Expected[${ROLE_LEARNER}]`)
+            this.throwError(`Unexpected user role[${this.userId}.${this.userRole}] - Expected[${ROLE_LEARNER}]`)
         }
     }
     async learnerCheckSatus() {

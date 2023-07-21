@@ -33,7 +33,8 @@ const _Console = function () {
      * MAIN -> Main node thread (scripts, runner...) 
      * W001 -> Worker thread N°1 (codes executed inside a worker)
      */
-    const _threadPrefix = `${isMainThread ? `${chalk.cyan('MAIN')}` : `${chalk.green(`W${threadId.toString().padStart(3, '0')}`)}`}`
+    this.threadId = `${isMainThread ? 'MAIN' : `W${threadId.toString().padStart(isNumber(process.env.SLDX_CONSOLE_THREAD_NBDIGITS) ? parseInt(process.env.SLDX_CONSOLE_THREAD_NBDIGITS) : 3, '0')}`}`
+    const threadPrefix = `${isMainThread ? `${chalk.cyan(this.threadId)}` : `${chalk.green(this.threadId)}`}`
 
     const _errorProcessArgs = (argArray) => {
         argArray ??= []
@@ -97,17 +98,17 @@ const _Console = function () {
      * process env needs to be called each times because the first process doesn't have this variable available
      */
     this.setTraceEnvConfig = (p) => {
-        if (process.env.SLDX_TRACE_CONSOLE == null) {
+        if (process.env.SLDX_CONSOLE_TRACE == null) {
             /** 
              * value before loading env variables from .env 
              * call myConsole.enableConsole(true/false) at the begeging of the process to force to false
              */
-            process.env.SLDX_TRACE_CONSOLE = true
+            process.env.SLDX_CONSOLE_TRACE = true
         }
         const _isTrue = (varname) => {
             return process.env[varname] === 'true' || process.env[varname] === true
         }
-        this.enableConsole(_isTrue('SLDX_TRACE_CONSOLE'))
+        this.enableConsole(_isTrue('SLDX_CONSOLE_TRACE'))
         _traceRequests = _isTrue('SLDX_TRACE_HTTP_REQUESTS')
         _traceResponses = _isTrue('SLDX_TRACE_HTTP_RESPONSES')
         _traceResponseBody = _isTrue('SLDX_TRACE_HTTP_RESPONSE_BODY')
@@ -139,14 +140,15 @@ const _Console = function () {
      *      level: 'debug', 
      *      serviceName: 'qsfab-myLogger',
      *      false means that logFilePath is thead safe
-     *      threadSafe: true
+     *      threadPrefix: threadName
      * } 
      */
     this.initLogger = (logFileName, opts) => {
         opts = Object.assign({
             /** force log dir */
-            logDirPath: process.env.SLDX_LOG_DIR_PATH
-        }, opts?? {})
+            logDirPath: process.env.SLDX_LOG_DIR_PATH,
+            threadPrefix: this.threadId
+        }, opts ?? {})
         if (_.isEmpty(opts.logDirPath)) {
             this.warning(`Can't create qsConsolelogger [${logFileName}] - Process.env.SLDX_LOG_DIR_PATH is empty`)
             return
@@ -212,10 +214,10 @@ const _Console = function () {
     }
 
     this.enableConsole = (yes = true) => {
-        const oldState= _traceConsole == true
+        const oldState = _traceConsole == true
         const newSate = yes == true
         if (newSate != oldState) {
-            console.log(chalk.magentaBright(`${_threadPrefix} console ${newSate ? 'enabled' : 'disabled'}`))
+            console.log(chalk.magentaBright(`${threadPrefix} console ${newSate ? 'enabled' : 'disabled'}`))
         }
         _traceConsole = newSate
     }
@@ -227,7 +229,7 @@ const _Console = function () {
         const d = new Date()
         d.setTime(new Date().getTime() - _t0)
         const prefix = chalk.gray(`${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}:${d.getMilliseconds().toString().padStart(3, '0')}`)
-        console.log.apply(console, [_threadPrefix, prefix, ...args])
+        console.log.apply(console, [threadPrefix, prefix, ...args])
     }
 
     this.hasLoger = () => {
@@ -464,8 +466,8 @@ if (!process.sldxGlobals[globalsKey]) {
 } else {
     const konsole = process.sldxGlobals[globalsKey]
     /** 
-     * Update status with SLDX_TRACE_CONSOLE env variable of the current process
-     * SLDX_TRACE_CONSOLE,... may have not been initialized by the proccess that created the myConsole
+     * Update status with SLDX_CONSOLE_TRACE env variable of the current process
+     * SLDX_CONSOLE_TRACE,... may have not been initialized by the proccess that created the myConsole
      */
     konsole.setTraceEnvConfig(process)
 }

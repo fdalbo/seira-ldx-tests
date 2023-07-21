@@ -1,10 +1,10 @@
 #https://www.artillery.io/docs/reference/test-script
 config:
   target: http://localhost:2020/
-   phases:
-     - duration: 10
-       arrivalRate: 1
-       rampTo: 5
+  phases:
+    - duration: 10
+      arrivalRate: 1
+      rampTo: 2
   # Load the Playwright engine:
   engines:
     playwright: {}

@@ -1,5 +1,6 @@
 
 const myConsole = require('#commons/myConsole')
+const path = require('path')
 const _ = require('lodash')
 const _classes = [
     require('./Script1')
@@ -14,8 +15,10 @@ module.exports.scriptTimeout = () => {
 }
 
 module.exports.runScript = async (className, scriptFilePath, pwPage) => {
-    let err = null
+    let runError = null
     try {
+        const name = path.basename(scriptFilePath)
+        myConsole.initLoggerFromModule(name)
         myConsole.superhighlight(`BEGIN RUN ${className}`)
         myConsole.lowlight(`From [${scriptFilePath}]`)
         if (_.isEmpty(process.env.SLDX_RUNNER_EXEC)) {
@@ -26,12 +29,13 @@ module.exports.runScript = async (className, scriptFilePath, pwPage) => {
         if (klass == null) {
             throw new Error(`Script Class [${className}] not found`)
         }
-        await new klass(scriptFilePath, pwPage).run()
+        const script = new klass(scriptFilePath, pwPage)
+        await script.run()
     } catch (e) {
         myConsole.error(`Error running ${className}`, e)
-        err = e
+        runError = true
         throw e
     } finally {
-        myConsole.superhighlight(`END RUN ${err ? 'KO' : 'OK'} ${className}`)
+        myConsole.superhighlight(`END RUN ${runError ? 'KO' : 'OK'} ${className}`)
     }
 }

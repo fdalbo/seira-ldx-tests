@@ -15,6 +15,6 @@ module.exports = {
         radioCheckbox: 1000,
         cardDisplay: 1000,
         textInput: 1000,
-        modal: 1000
+        modal: 2000
     },
 }

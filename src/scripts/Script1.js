@@ -16,7 +16,7 @@ module.exports = class Script1 extends ScriptRunner {
     await this.clickNextCard()
     await this.clickNextCard()
     await this.clickNextCard()
-    await this.clickNextCard()
+    await this.clickNextCardBeforeModal()
     await this.clickModalCancel()
     await this.clickPrevCard()
     await this.clickPrevCard()
@@ -31,7 +31,7 @@ module.exports = class Script1 extends ScriptRunner {
     /** card attention!! */
     await this.clickNextCard()
     /** Etes vous sur de vouloir de démarrer ? */
-    await this.clickNextCard()
+    await this.clickNextCardBeforeModal()
     /** Dialog */
     await this.clickModalOK()
     /** First quiz 3 radios */

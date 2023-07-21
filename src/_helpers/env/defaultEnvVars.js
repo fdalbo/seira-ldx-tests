@@ -1,6 +1,7 @@
 'use strict';
 
 const appRootDir = require('app-root-dir')
+const myConsole = require('#commons/myConsole')
 const _ = require('lodash')
 const _ARGS_PREFIX = 'sldx'
 module.exports.ARGS_PREFIX = _ARGS_PREFIX
@@ -17,9 +18,15 @@ const DEFAULT_VARS = [
         arg: _SLDX_ENV_ARG
     }, {
         /** false doesn't trace http Req/Resp and myConsole.trace() in the console (only in log file)*/
-        name: 'SLDX_TRACE_CONSOLE',
+        name: 'SLDX_CONSOLE_TRACE',
         allowEmpty: true,
         value: 'true',
+        type: 'boolean'
+    }, {
+        /** Worker 1 prefix=W0001 */
+        name: 'SLDX_CONSOLE_THREAD_NBDIGITS',
+        allowEmpty: true,
+        value: '4',
         type: 'boolean'
     }, {
         name: 'SLDX_TRACE_HTTP_REQUESTS',
@@ -73,6 +80,18 @@ const DEFAULT_VARS = [
         /** /$host -> we create a SLDX_PROXY_HOST's hostname under /SLDX_LOG_DIR_PATH */
         value: `./_logs/$host`
     }, {
+        /** calculated  SLDX_LOG_DIR_PATH/screenshots */
+        name: 'SLDX_SCREENSHOTS_DIR_PATH',
+        allowEmpty: true,
+        highlight: true,
+        value: ''
+    }, {
+        /** calculated  SLDX_LOG_DIR_PATH/screenshots */
+        name: 'SLDX_METRICS_DIR_PATH',
+        allowEmpty: true,
+        highlight: true,
+        value: ''
+    }, {
         name: 'SLDX_WORK_DIR_PATH',
         dirPath: true,
         arg: `${_ARGS_PREFIX}WorkDir`,
@@ -115,11 +134,15 @@ const DEFAULT_VARS = [
         highlight: true
     }, {
         name: 'SLDX_USER_FIRST_IDX',
+        arg: `${_ARGS_PREFIX}FirstIdx`,
         type: 'numeric',
         value: '0'
     }, {
         name: 'SLDX_USER_PREFIX',
         value: 'user'
+    }, {
+        name: 'SLDX_METRICS_ENABLED',
+        value: 'true'
     }, {
         name: 'SLDX_USER_PWD',
         value: 'seira'
@@ -213,7 +236,7 @@ module.exports.appendToDefaultVars = function (myEnvVars) {
             return false
         }
         if (x.values && x.values.indexOf(x.value) < 0) {
-            console.warn(`!! Environment variable ${x.name} - Unexpected value ${x.value}\Expected values : '${x.values.join(',')}'`)
+            myConsole.warning(`!! Environment variable ${x.name} - Unexpected value ${x.value}\Expected values : '${x.values.join(',')}'`)
         }
         return true
     })
@@ -228,7 +251,7 @@ module.exports.getEnvValues = function () {
         if (v) {
             res.push({ name: v.name, value: process.env[v.name] })
         } else {
-            console.warn(`defaultEnvVars - unexpected null DEFAULT_VARS value (check double comma ', ,' in DEFAULT_VARS array)`)
+            myConsole.warning(`defaultEnvVars - unexpected null DEFAULT_VARS value (check double comma ', ,' in DEFAULT_VARS array)`)
         }
     }
     return res

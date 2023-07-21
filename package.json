@@ -33,6 +33,7 @@
     "dotenv": "~16.3.1",
     "escape-string-regexp": "~5.0.0",
     "execa": "~5.1",
+    "fast-csv": "^4.3.6",
     "fs-extra": "~11.1.1",
     "is-number": "~7.0.0",
     "is-valid-path": "~0.1.1",
@@ -45,6 +46,7 @@
     "pretty-format": "~29.6.1",
     "read-package-json": "~6.0.4",
     "rimraf": "~5.0.1",
+    "stats-incremental": "^1.2.1",
     "strip-ansi": "~6.0",
     "winston": "~3.10.0"
   },

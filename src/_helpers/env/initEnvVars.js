@@ -190,6 +190,7 @@ module.exports.initEnvVars = (additionalEnvVars, options) => {
     const urlPath = process.env.SLDX_PROXY_HOST.replace(/([^a-zA-Z0-9])/g, '-')
     const datePath = dateFormat(new Date(), 'yyyy-mm-dd-HH-MM-ss')
     const dayPath = dateFormat(new Date(), 'yyyy-mm-dd')
+    let logDirPath = null
     for (const envVar of environmentVariables) {
         if (envVar.dirPath === true && envVar.value.length !== 0) {
             /** THIS IS A FOLDER PATH */
@@ -219,6 +220,7 @@ module.exports.initEnvVars = (additionalEnvVars, options) => {
             /** !!! LOGS ONlY - To not clear other directories like  SLDX_APP_ROOTDIR*/
             if (envVar.name === 'SLDX_LOG_DIR_PATH' && removeLogDirFiles === true) {
                 fs.emptyDirSync(folderPath)
+                logDirPath = folderPath
             } else {
                 fs.ensureDirSync(folderPath)
             }
@@ -228,9 +230,25 @@ module.exports.initEnvVars = (additionalEnvVars, options) => {
             /** SLDX_PROXY_URL */
             envVar.value = `${process.env.SLDX_PROXY_PROTOCOL}://${process.env.SLDX_PROXY_HOST}${process.env.SLDX_PROXY_PORT ? `:${process.env.SLDX_PROXY_PORT}` : ''}`
         }
-        /** UPDATE process.env */
-        process.env[envVar.name] = envVar.value
     }
+
+    /** calculated variables */
+    const screenshotsPathVar = environmentVariables.find(x => x.name == 'SLDX_SCREENSHOTS_DIR_PATH')
+    if (logDirPath && screenshotsPathVar) {
+        screenshotsPathVar.value = path.resolve(logDirPath, 'screenshots')
+        fs.ensureDirSync(screenshotsPathVar.value)
+    }
+    const metricPathVar = environmentVariables.find(x => x.name == 'SLDX_METRICS_DIR_PATH')
+    if (logDirPath && metricPathVar) {
+        metricPathVar.value = path.resolve(logDirPath, 'metrics')
+        fs.ensureDirSync(metricPathVar.value)
+    }
+    /** Update  process.env */
+    for (const envVar of environmentVariables) {
+        /** UPDATE process.env */
+        process.env[envVar.name] = envVar.value ?? ''
+    }
+
     /** ADDS PROCESS.ENV VARIABLES FROM environmentVariables */
 
     environmentVariables.sort((a, b) => a.name.localeCompare(b.name))
