@@ -12,7 +12,7 @@ const {
     workerData: _workerData,
     threadId: _workertThreadId
 } = require('worker_threads')
-const _verbose = true
+const _verbose = false
 const _sendToMainThread = false
 const {
     initConfig,
@@ -273,7 +273,7 @@ exports.ScriptRunner = class ScriptRunner {
             return
         }
         stats.update(elapsedMs)
-        _verbose && this.log(`updateMetric.${clickInfo.type}.${metricId} label[${clickInfo.label}] elapsedMs[${elapsedMs}] count[${stats.n}] mean[${stats.mean}]`)
+        this.log(`updateMetric.${clickInfo.type}.${metricId} label[${clickInfo.label}] elapsedMs[${elapsedMs}] count[${stats.n}] min[${stats.min}] max[${stats.max}] mean[${Math.floor(stats.mean)}] `)
         await this.sendMetrics(stats, clickInfo, elapsedMs)
     }
     /**
@@ -326,7 +326,7 @@ exports.ScriptRunner = class ScriptRunner {
         if (isNaN(tempoMs)) {
             this.throwError(`Config - Bad 'tempo' value [${tempoMs}ms/${tempo}]`)
         }
-        this.log(`[${new String(this.stepIdx++).padStart(2, 0)}] threadId[${_workertThreadId}] page[${this.pwPageId()}] tempoMs[${tempoMs}]`)
+        this.log(`[${new String(this.stepIdx++).padStart(2, 0)}] page[${this.pwPageId()}] tempoMs[${tempoMs}]`)
         await pause(tempoMs);
     }
     async clickMenuApprenant(tempo) {
@@ -462,10 +462,10 @@ exports.ScriptRunner = class ScriptRunner {
         await this.applyAndMesure(pageInfo, tempo, this.pwPage, this.pwPage.goto, url)
     }
     log(message) {
-        myConsole.lowlight.call(myConsole, `[${_workertThreadId} ]${message}`)
+        myConsole.lowlight.call(myConsole, message)
     }
     logHighlight(message) {
-        myConsole.highlight.call(myConsole, `[${_workertThreadId} ]${message}`)
+        myConsole.highlight.call(myConsole, message)
     }
     async run() {
         try {
