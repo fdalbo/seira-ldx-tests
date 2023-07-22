@@ -1,11 +1,13 @@
 #https://www.artillery.io/docs/reference/test-script
+# COMMAND WORKERS=200 artillery run ./artillery/test-vusers.yml
+# creates 200 workers and run one script per worker 
 config:
   target: http://localhost:2020/
   phases:
     - name: Warm up phase
       duration: 1
-      maxVusers: 10
-      arrivalRate: 10
+      maxVusers: 200
+      arrivalRate: 200
 
 #--------------------------------------------------------------------------------
 # The following example creates 20 virtual users in 60 seconds (one virtual user approximately every 3 seconds):

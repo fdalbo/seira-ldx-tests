@@ -9,6 +9,7 @@
   "license": "ISC",
   "scripts": {
     "displayEnVariables": "node runner.artillery.js",
+    "artillery.test.vusers": "node runner.artillery.js test-vusers.yml",
     "artillery.script1": "node runner.artillery.js test-script1.yml",
     "artillery.script1.debug": "node runner.artillery.js test-script1-debug.yml --sldxenv=debug",
     "playwright.script1": "node runner.playwright.js script1.spec.js",
@@ -41,6 +42,7 @@
     "lodash": "~4.17.21",
     "minimist": "~1.2.8",
     "moment-timezone": "~0.5.43",
+    "mongodb": "^5.7.0",
     "n-readlines": "~1.0.1",
     "numeral": "~2.0.6",
     "pretty-format": "~29.6.1",

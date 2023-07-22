@@ -62,9 +62,16 @@
    - Lance le script avec N users (voir propriété ``phases``)
    - Dans chaque worker (sous-process) le user est calculé via le N° du worker (variable ``LOCAL_WORKER_ID``)
    -  ``user8 pour worker 8 LOCAL_WORKER_ID = '8'``
+ - ``artillery/test-vusers.yml`` 
+   - Lance le script pour tester le fonctionnement d'artilery et des workers
  - Commandes
    - ``npm run artillery.script1``
-   - ``npm run artillery.script1.denbug ``
+   - ``npm run artillery.script1.debug``
+   - ``npm run artillery.test.vusers``
+   - ``npm run displayEnVariables`` pour afficher les variables d'environnment
+ - workers
+   - Artillery alloue par défaut 11 workers et lance les test dans ces workers. Si on lance 20 tests par exemple ile seront répartis entre les 10 workers. N scenarii peuvent s'exécuter dans un même worker ce qui n'est pas compatible avec le fonctionnement du ScriptRunner qui nécessite un worker par exécution (lié aux variables d'environnement).
+   - Pour forcer le nombre de workers utiliser ``WORKERS`` ``WORKERS=100 artillery run ./artillery/test-vusers.yml``
  - **Report from .json file**
    - ``artillery report ./artillery-report/test-script1-debug-2023-07-21-5users.json``
 - **Playwright**
@@ -73,7 +80,6 @@
     - ```npm run playwright.script1.debug -- --sldxpwuser=user4 ```
     - ```npm run playwright.script1 -- --sldxpwuser=user4 ```
     - ```npm run playwright.script1 -- --sldxpwuser=user1 --ui``` ppour le mode UI interractif
-  
  - **debuggage dans chromium**
     - Lancer le scripts en mode debug
     - Ouvrir la console JS dans chromium
@@ -89,5 +95,5 @@
 - **screenshots si erreur playwright**
  - ``_logs/localhost/2023-07-21/tests/screenshots``
 - **sMetrics©**
- - ``_logs/localhost/2023-07-21/tests/screenshots``
+ - ``_logs/localhost/2023-07-21/tests/metrics``
 
