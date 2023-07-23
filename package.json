@@ -13,7 +13,8 @@
     "artillery.script1": "node runner.artillery.js test-script1.yml",
     "artillery.script1.debug": "node runner.artillery.js test-script1-debug.yml --sldxenv=debug",
     "playwright.script1": "node runner.playwright.js script1.spec.js",
-    "playwright.script1.debug": "node runner.playwright.js script1.spec.js --sldxenv=debug --debug"
+    "playwright.script1.debug": "node runner.playwright.js script1.spec.js --sldxenv=debug --debug",
+    "mongoClient": "node ./_mongo/mongoClient.js"
   },
   "imports": {
     "#src/*": "./src/*.js",
@@ -46,6 +47,7 @@
     "n-readlines": "~1.0.1",
     "numeral": "~2.0.6",
     "pretty-format": "~29.6.1",
+    "prompts": "^2.4.2",
     "read-package-json": "~6.0.4",
     "rimraf": "~5.0.1",
     "stats-incremental": "^1.2.1",

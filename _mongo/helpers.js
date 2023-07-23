@@ -1,15 +1,22 @@
 const { CollectionInfo, MongoClient, ObjectId } = require('mongodb')
 const myConsole = require('#commons/myConsole')
-const { nullFormat } = require('numeral')
+const prompts = require('prompts')
+const _ = require('lodash')
 
-
-module.exports.DBNAMES = {
+const _USERS = {
+    PREFIX: 'testperfs',
+    PASSWORD: 'seira',
+    ENCRYPTED_PASSWORD: '$2a$10$egusEbUGmahKRCwcLgks1el2DyNJadEbNM57BnouqynHkn5VxZjj.'
+}
+module.exports.USERS = _USERS
+const _DBNAMES = {
     SEIRASSO: 'seirasso',
     SEIRADB: 'seiradb',
     SEIRALICENCE: 'licencemanagementdb',
     SEIRALICENCESSO: 'licencemanagementsso',
 }
-module.exports.SEIRASSO_COLLECTIONS = {
+module.exports.DBNAMES = _DBNAMES
+const _SEIRADB_COLLECTIONS = {
     ALERTS: 'alerts',
     CAREERS: 'careers',
     CAREERTRACKINGS: 'careertrackings',
@@ -35,33 +42,8 @@ module.exports.SEIRASSO_COLLECTIONS = {
     USERROLES: 'userroles',
     VISIOCHATS: "visiochats"
 }
-module.exports.SEIRADB_COLLECTIONS = {
-    ALERTS: 'alerts',
-    CAREERS: 'careers',
-    CAREERTRACKINGS: 'careertrackings',
-    CERTIFICATETEMPLATES: 'certificatetemplates',
-    CERTIFICATIONS: 'certifications',
-    CHATS: 'chats',
-    CONTAINERGROUPS: 'containergroups',
-    CURRENTTHEMES: 'currentthemes',
-    CUSTOMACTIVITIES: 'customactivities',
-    INSTANCECONFIGS: 'instanceconfigs',
-    MODULES: 'modules',
-    MYCOMPANIES: 'mycompanies',
-    NEWSFEEDS: 'newsfeeds',
-    NOTIFICATIONS: 'notifications',
-    PRECONFIGUREDS: 'preconfigureds',
-    PUBLISHEDCAREERS: 'publishedcareers',
-    PUBLISHEDCAREERSESSIONS: 'publishedcareersessions',
-    PUBLISHEDSKILLCERTIFICATIONS: 'publishedskillcertifications',
-    REPORTTEMPLATES: 'reporttemplates',
-    SESSIONEDUCATIONALFOLLOWUPS: 'sessioneducationalfollowups',
-    SESSIONLEARNERSTAKEHOLDERS: 'sessionlearnerstakeholders',
-    THEMES: 'themes',
-    USERROLES: 'userroles',
-    VISIOCHATS: 'visiochats"'
-}
-module.exports.SEIRASSO_COLLECTIONS = {
+module.exports.SEIRADB_COLLECTIONS = _SEIRADB_COLLECTIONS
+const _SEIRASSO_COLLECTIONS = {
     GROUPS: 'groups',
     LICENCES: 'licences',
     LOGINHISTORIES: 'loginhistories',
@@ -70,10 +52,14 @@ module.exports.SEIRASSO_COLLECTIONS = {
     PROFILEHISTORIES: 'profilehistories',
     PROFILES: 'profiles'
 }
+module.exports.SEIRASSO_COLLECTIONS = _SEIRASSO_COLLECTIONS
+
+
 module.exports.SeiraMongoClient = class SeiraMongoClient extends MongoClient {
     #url = null
 
     constructor(url) {
+        myConsole.highlight(`MongoClient url [${url}]`)
         super(url)
         this.#url = url
         this.log(`New MongoClient class[${this.className}] url[${this.url}]`)
@@ -103,7 +89,7 @@ module.exports.SeiraMongoClient = class SeiraMongoClient extends MongoClient {
         return this.#url
     }
     get seirassoDb() {
-        return this.db(module.exports.DBNAMES.SEIRASSO);
+        return this.db(_DBNAMES.SEIRASSO);
     }
     async seirassoCollection(collectionName) {
         return this.seirassoDb.collection(collectionName)
@@ -124,6 +110,42 @@ module.exports.SeiraMongoClient = class SeiraMongoClient extends MongoClient {
     async connect() {
         this.loghighlight(`mongo client connected to ${this.url}`)
         await super.connect();
+    }
+    async confirm(message, exitProcess = true) {
+        const response = await prompts({
+            type: 'confirm',
+            name: 'value',
+            message: message,
+            initial: false
+        })
+        if (response.value !== true && exitProcess === true) {
+            this.loghighlight(`Operation canceled - exit process`)
+            process.exit(1)
+        }
+        return response.value == true
+    }
+    async askAndExecAction() {
+        let response = await prompts({
+            type: 'select',
+            name: 'value',
+            message: 'Pick an acion',
+            choices: [
+                { title: 'Udapdate passwords', description: `For all user.alias.match('/${_USERS.PREFIX}*[0-9]+/') replaces the password by '${_USERS.PASSWORD}'`, value: 'updatePwd' },
+                { title: 'Update user name', description: `For all user.alias.match('/user[0-9]+/') replaces 'users*' by ${_USERS.PREFIX}*`, value: 'updateUserName' },
+            ],
+            initial: null
+        })
+        if (_.isEmpty(response.value)) {
+            this.loghighlight(`Operation canceled - exit process`)
+            process.exit(1)
+        }
+        const method = this[response.value]
+        if (!_.isFunction(method)) {
+            client.loghighlight(`Mongoclient does not provide '${response.value}' method - Exit process`)
+            process.exit(1)
+        }
+        await this.confirm(`Confirm action '${response.value}'`)
+        await this.run(method)
     }
     async runBefore() {
     }
