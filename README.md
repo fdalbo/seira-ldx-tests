@@ -37,11 +37,11 @@
     ```
         SLDX_PROXY_PROTOCOL: obligatoire
         SLDX_PROXY_HOST: obligatoire
-        SLDX_ADMIN_USER: obligatoire
-        SLDX_ADMIN_PASSWORD: obligatoire  
+        SLDX_ADMIN_ID: obligatoire
+        SLDX_ADMIN_PWD: obligatoire  
     ```
   - ``config.script1.toto.js`` surcharge la config de base (``config.script1.js``) si fichier présent
-- ``SLDX_USER_PREFIX=user`` permet de calculer le nom de l'utilisatuer ``SLDX_USER_PREFIX + index (user1, user2...)``
+- ``SLDX_LEARNER_PREFIX=user`` permet de calculer le nom de l'utilisatuer ``SLDX_LEARNER_PREFIX + index (user1, user2...)``
 ## Les scripts
 - **script1**
  - ``src/scripts/Script1.js``
@@ -50,7 +50,7 @@
       - ``testFunction: "script1"`` du fichier ``.yml`` donne le nom du test à lancer
     - playwright: ``playwright/script1.spec.js`` 
       - Playwright est utilisé pour la mise au point
-      - Artillery lance autant de tests playwright dans des workers node via la propriété ``- engine: playwright`` du fichier ``.yml``. La vaiable ``LOCAL_WORKER_ID`` est invréentée poru chaque wroker ce qui permet d'utiliser un user par worker basé sur l'index ``LOCAL_WORKER_ID`` et sur ``SLDX_USER_PREFIX`` (user1, user2....)
+      - Artillery lance autant de tests playwright dans des workers node via la propriété ``- engine: playwright`` du fichier ``.yml``. La vaiable ``LOCAL_WORKER_ID`` est invréentée poru chaque wroker ce qui permet d'utiliser un user par worker basé sur l'index ``LOCAL_WORKER_ID`` et sur ``SLDX_LEARNER_PREFIX`` (user1, user2....)
       - Playwright execute tous les tessts (un seul dans notre cas) en parallèle ou non (voir ``playwright.config.js``)
       - Playwright fonctionne comme JEST
 - **Artillery**
@@ -96,4 +96,34 @@
  - ``_logs/localhost/2023-07-21/tests/screenshots``
 - **sMetrics©**
  - ``_logs/localhost/2023-07-21/tests/metrics``
+- **CaddyFile logging configuration**
+```
+{
+    debug off
+    auto_https off
+    http_port 80
+    log default {
+        level INFO
+        output file ./access.log {
+            roll_uncompressed
+            roll_keep 10    
+            roll_size 10Mib
+        }
+        format filter {
+            wrap console
+            fields {
+                request>remote_ip   delete
+                request>remote_port  delete
+                request>proto       delete
+                request>headers     delete
+                request>host        delete
+                size                delete
+                user_id             delete
+                resp_headers        delete
+                request>uri regexp "(.*)\?.*$" "${1}"
+            }
+        }
+    }
+}
+```
 

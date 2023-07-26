@@ -1,4 +1,3 @@
-const helpers = require('./config.helpers')
 const path = require('path')
 const fs = require('fs')
 const _ = require('lodash')
@@ -9,25 +8,63 @@ const myConsole = require('#commons/myConsole')
 const { SLDX_ENV_VAR } = require('#env/defaultEnvVars')
 
 exports.ROLE_LEARNER = 'learner'
+exports.ROLE_TEACHER = 'teacher'
+exports.ROLE_ADMIN = 'admin'
 exports.TEMPO_PAGE = 'page'
 exports.TEMPO_RADIO = 'radioCheckbox'
 exports.TEMPO_CARD_DISPLAY = 'cardDisplay'
 exports.TEMPO_TEXT_INPUT = 'textInput'
 exports.TEMPO_MODAL = 'modal'
 
+
+const _getArtilleryUser = () => {
+    const workerIdx = parseInt(process.env.LOCAL_WORKER_ID ?? '')
+    if (isNaN(workerIdx)) {
+        throw new Error(`Running artillery - Unexpected empty 'LOCAL_WORKER_ID' env variable`)
+    }
+    const userPrefix = process.env.SLDX_LEARNER_PREFIX ?? 'user'
+    if (userPrefix.length == 0) {
+        throw new Error(`Running artillery - Unexpected empty 'SLDX_LEARNER_PREFIX' env variable`)
+    }
+    /**
+     * userPrefix1, 2, 3....
+     */
+    const userFirstIdx = workerIdx + parseInt(process.env.SLDX_ARTILLERY_USER_FIRST_IDX ?? '0')
+    if (isNaN(userFirstIdx)) {
+        throw new Error(`Running artillery - Unexpected empty 'SLDX_ARTILLERY_USER_FIRST_IDX' env variable`)
+    }
+    return `${userPrefix}${userFirstIdx}`
+}
+const _getPlaywrightUser = () => {
+    const user = process.env.SLDX_PLAYWRIGHT_USER ?? ''
+    if (user.length == 0) {
+        throw new Error(`Running playwright - Unexpected empty 'SLDX_PLAYWRIGHT_USER' env variable`)
+    }
+    return user
+}
+
 let _config = null
 const _baseConfig = {
     /** artillery / playwright */
     exec: process.env.SLDX_RUNNER_EXEC,
     proxyUrl: process.env.SLDX_PROXY_URL,
-    admin: {
-        user: process.env.SSLDX_ADMIN_USER,
-        name: process.env.SSLDX_ADMIN_PASSWORD ?? ''
-    },
-    user: {
-        id: null,
-        password: process.env.SLDX_USER_PWD,
-        role: exports.ROLE_LEARNER
+    users: {
+        admin: {
+            user: process.env.SSLDX_ADMIN_USER,
+            name: process.env.SSLDX_ADMIN_PASSWORD,
+            role: exports.ROLE_ADMIN
+        },
+        learner: {
+            /** many learners testperfs.learner.1, .2 ... */
+            id: null,
+            password: process.env.SLDX_LEARNER_PWD,
+            role: exports.ROLE_LEARNER
+        },
+        teacher: {
+            id: process.env.SLDX_TEACHER_ID,
+            password: process.env.SLDX_TEACHER_PWD,
+            role: exports.ROLE_TEACHER
+        }
     },
     mongo: {
         host: process.env.SLDX_MONGO_HOST,
@@ -48,31 +85,31 @@ const _baseConfig = {
     },
     artillery: {
         user: {
-            id: helpers.getArtilleryUser,
-            password: process.env.SLDX_USER_PWD ?? ''
+            id: _getArtilleryUser,
+            password: process.env.SLDX_LEARNER_PWD ?? ''
         },
     },
     playwright: {
         user: {
-            id: helpers.getPlaywrightUser,
-            password: process.env.SLDX_USER_PWD ?? ''
+            id: _getPlaywrightUser,
+            password: process.env.SLDX_LEARNER_PWD ?? ''
         },
     },
     scenario: null,
     getUserId: (...args) => {
-        let userId = _config[process.env.SLDX_RUNNER_EXEC].user.id ?? ''
-        if (typeof userId == 'function') userId = userId.apply(this, args)
-        userId = userId.toString().trim()
-        if (typeof userId.length == 0) {
-            throw new Error(`Unexptected empty user.id`)
+        let learnerId = _config[process.env.SLDX_RUNNER_EXEC]?.users?.learner.id ?? ''
+        if (typeof learnerId == 'function') learnerId = learnerId.apply(this, args)
+        learnerId = learnerId.toString().trim()
+        if (typeof learnerId.length == 0) {
+            throw new Error(`Unexptected empty learner.id`)
         }
-        return userId
+        return learnerId
     },
     getUserPwd: () => {
-        return _config[process.env.SLDX_RUNNER_EXEC].user.password ?? ''
+        return _config[process.env.SLDX_RUNNER_EXEC]?.users?.learner?.password ?? ''
     }
 }
-module.exports.initConfig = (scriptId) => {
+const _initConfig = (scriptId) => {
     if (!['artillery', 'playwright'].includes(process.env.SLDX_RUNNER_EXEC)) {
         throw new Error(`Unknown value for SLDX_RUNNER_EXEC [${process.env.SLDX_RUNNER_EXEC}]`)
     }
@@ -102,3 +139,8 @@ module.exports.initConfig = (scriptId) => {
     myConsole.lowlight(`Config:\n${prettyFormat(_config)}\n©`)
     return _config
 }
+
+
+module.exports.getArtilleryUser = _getArtilleryUser
+module.exports.getPlaywrightUser = _getPlaywrightUser
+module.exports.initConfig = _initConfig

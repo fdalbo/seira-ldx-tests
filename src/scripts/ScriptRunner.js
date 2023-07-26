@@ -1,3 +1,4 @@
+'use strict';
 
 const myConsole = require('#commons/myConsole')
 const { pause } = require('#commons/promises')
@@ -142,8 +143,8 @@ exports.ScriptRunner = class ScriptRunner {
     name = null
     pwPage = null
     config = null
-    userId = null
-    userRole = null
+    learnerId = null
+    learnerRole = null
     scenario = null
     errorIdx = 0
     metrics = null
@@ -154,15 +155,14 @@ exports.ScriptRunner = class ScriptRunner {
         this.pwPage = pwPage
         this.config = initConfig(this.className.toLowerCase())
         this.scenario = this.config.scenario ?? {}
-        this.userId = this.config.getUserId()
-        this.userRole = this.config.user.role ?? 'empty'
+        this.learnerId = this.config.getUserId()
+        this.learnerRole = this.config?.users?.learner?.role ?? 'empty'
         /** see https://playwright.dev/docs/api/class-page#page-set-default-navigation-timeout  */
         pwPage.setDefaultNavigationTimeout(this.config.timeouts.defaultNavigationTimeout ?? 1000)
         /** seehttps://playwright.dev/docs/api/class-page#page-set-default-timeout */
         pwPage.setDefaultTimeout(this.config.timeouts.defaultTimeout ?? 1000)
-        this._initMetrics()
     }
-    _initMetrics() {
+    async asyncInit() {
         /** Metric */
         if (process.env.SLDX_METRICS_ENABLED == 'true') {
             this.metrics = {
@@ -370,7 +370,7 @@ exports.ScriptRunner = class ScriptRunner {
             }
         }
         if (text.toLowerCase() != 'démarrer') {
-            this.throwError(`User[${this.userId}] - Unexpected 'start career' button - Expected[démarrer] Got[${text}]`)
+            this.throwError(`User[${this.learnerId}] - Unexpected 'start career' button - Expected[démarrer] Got[${text}]`)
         }
         await this.clickByRole(_CLICKABLE.BUTTONS.DEMARRER, tempo)
     }
@@ -484,9 +484,9 @@ exports.ScriptRunner = class ScriptRunner {
         }
     }
     async login(tempo) {
-        this.logHighlight(`login ${this.userId}/${this.config.getUserPwd()} [${this.userRole}]`)
+        this.logHighlight(`login ${this.learnerId}/${this.config.getUserPwd()} [${this.learnerRole}]`)
         await this.gotoPage(_CLICKABLE.PAGES.CLIENT)
-        await this.fillLabel('Veuillez entrer votre identifiant ou e-mail *', this.userId)
+        await this.fillLabel('Veuillez entrer votre identifiant ou e-mail *', this.learnerId)
         await this.fillLabel('Mot de passe : *', this.config.getUserPwd())
         await this.clickConnect()
         await pause(1000)
@@ -499,7 +499,7 @@ exports.ScriptRunner = class ScriptRunner {
          * Eg: npm run playwright.script1 --  --sldxenv=fdalbo --sldxpwuser=user3 --ui
          */
         if ((this.isArtillery() || !this.isPlayWrightUi()) && expectedPogress != sessionProgress) {
-            this.throwError(`unexpected session progression for user[${this.userId}] - Expected[${expectedPogress}] - Got[${sessionProgress}]`)
+            this.throwError(`unexpected session progression for user[${this.learnerId}] - Expected[${expectedPogress}] - Got[${sessionProgress}]`)
         }
     }
     async getSessionProgression() {
@@ -510,11 +510,11 @@ exports.ScriptRunner = class ScriptRunner {
     async afterLogin() {
         this.logHighlight(`afterLogin`)
         await this.clickMenuApprenant()
-        if (this.userRole = ROLE_LEARNER) {
+        if (this.learnerRole = ROLE_LEARNER) {
             await this.learnerCheckSatus()
         } else {
             /** In case we want to develop scenarri for other  user roles */
-            this.throwError(`Unexpected user role[${this.userId}.${this.userRole}] - Expected[${ROLE_LEARNER}]`)
+            this.throwError(`Unexpected user role[${this.learnerId}.${this.learnerRole}] - Expected[${ROLE_LEARNER}]`)
         }
     }
     async learnerCheckSatus() {
@@ -523,4 +523,97 @@ exports.ScriptRunner = class ScriptRunner {
     async beforeEnd() {
         await pause(1000);
     }
+    async initTestContext(){
+
+    }
+    async removeSession(){
+
+    }
+    async createSession(){
+        /*
+
+Request URL:
+http://seira-ldx.seiralocaltest/server/api/careers-publish-sessions
+Request Method:
+PUT
+Status Code:
+200 OK
+
+{
+   "session":{
+      "_id":null,
+      "title":"testperfs",
+      "publishedCareer":"64ae803cc20f828c07357608",
+      "headTeachers":null,
+      "coaches":[
+         "64b543d215765cb9111d8aed"
+      ],
+      "startDate":"2023-07-24T00:00:00.000Z",
+      "endDate":"2023-07-30T23:59:59.999Z",
+      "learners":{
+         "individualUserIds":[
+            
+         ],
+         "groupIds":[
+            "64b2d5ea5c29e540bc1aba4e"
+         ]
+      },
+      "color":null,
+      "cardsToUnlockInfo":[
+         
+      ],
+      "unlockedCards":[
+         
+      ],
+      "accessDayTimeIntervals":[
+         
+      ],
+      "secondaryCoaches":[
+         
+      ]
+   }
+}
+        */
+    }
+    /**
+     * @returns the runner
+     */
+    static async factory(scriptFilePath, pwPage) {
+        const runner = new this(scriptFilePath, pwPage)
+        await runner.asyncInit()
+        return runner
+    }
+    static async runScript(scriptFilePath, pwPage) {
+        let runError = null
+        try {
+            const name = path.basename(scriptFilePath)
+            myConsole.initLoggerFromModule(name)
+            myConsole.superhighlight(`BEGIN RUN ${className}`)
+            myConsole.lowlight(`From [${scriptFilePath}]`)
+            if (_.isEmpty(process.env.SLDX_RUNNER_EXEC)) {
+                myConsole.warning(`\n\nProcess must be launched by the runner\n- npm run artillery.script1 --  --sldxenv=playwright.debug\n- npm run playwright.script1 --  --sldxenv=playwright.debug --sldxpwuser=user4 --debug\n\n`)
+                throw new Error(`Process must be launched by the runner`)
+            }
+            const klass = _classes.find(x => x.name === className)
+            if (klass == null) {
+                throw new Error(`Script Class [${className}] not found`)
+            }
+            const script = klass.factory(scriptFilePath, pwPage)
+            await script.run()
+        } catch (e) {
+            myConsole.error(`Error running ${className}`, e)
+            runError = true
+            throw e
+        } finally {
+            myConsole.superhighlight(`END RUN ${runError ? 'KO' : 'OK'} ${className}`)
+        }
+    }
+    static scriptTimeout() {
+        const to = parseInt(process.env.SLDX_PLAYWRIGTH_SCRIPT_TIMEOUT)
+        if (isNaN(to)) {
+            throw new Error('Unexpected not number process process.env.SLDX_PLAYWRIGTH_SCRIPT_TIMEOUT')
+        }
+        return to
+    }
+
 }

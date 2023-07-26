@@ -125,27 +125,39 @@ const DEFAULT_VARS = [
         value: '',
         highlight: true
     }, {
-        name: 'SLDX_ADMIN_USER',
-        arg: `${_ARGS_PREFIX}AdmipUser`,
+        name: 'SLDX_ADMIN_ID',
+        value: 'testperfs.admin',
+        arg: `${_ARGS_PREFIX}AdminId`,
         highlight: true
     }, {
-        name: 'SLDX_ADMIN_PASSWORD',
-        arg: `${_ARGS_PREFIX}AdmipPwd`,
+        name: 'SLDX_ADMIN_PWD',
+        value: 'seira',
+        arg: `${_ARGS_PREFIX}AdminPwd`,
         highlight: true
     }, {
-        name: 'SLDX_USER_FIRST_IDX',
+        name: 'SLDX_TEACHER_ID',
+        value: 'tesperfs.teacher',
+        arg: `${_ARGS_PREFIX}TeacherId`,
+        highlight: true
+    }, {
+        name: 'SLDX_TEACHER_PWD',
+        value: 'seira',
+        arg: `${_ARGS_PREFIX}TeacherPwd`,
+        highlight: true
+    }, {
+        name: 'SLDX_LEARNER_PWD',
+        value: 'seira'
+    }, {
+        name: 'SLDX_LEARNER_FIRST_IDX',
         arg: `${_ARGS_PREFIX}FirstIdx`,
         type: 'numeric',
         value: '0'
     }, {
-        name: 'SLDX_USER_PREFIX',
-        value: 'user'
+        name: 'SLDX_LEARNER_PREFIX',
+        value: 'tesperfs.learner'
     }, {
         name: 'SLDX_METRICS_ENABLED',
         value: 'true'
-    }, {
-        name: 'SLDX_USER_PWD',
-        value: 'seira'
     }, {
         name: 'SLX_ARTILLERY_ROOT_DIR',
         highlight: true,

@@ -14,7 +14,7 @@
     "artillery.script1.debug": "node runner.artillery.js test-script1-debug.yml --sldxenv=debug",
     "playwright.script1": "node runner.playwright.js script1.spec.js",
     "playwright.script1.debug": "node runner.playwright.js script1.spec.js --sldxenv=debug --debug",
-    "mongoClient": "node ./_mongo/mongoClient.js"
+    "mongoRun": "node ./_mongo/mongoRun.js"
   },
   "imports": {
     "#src/*": "./src/*.js",

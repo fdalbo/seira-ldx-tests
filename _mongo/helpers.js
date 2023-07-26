@@ -1,14 +1,25 @@
-const { CollectionInfo, MongoClient, ObjectId } = require('mongodb')
+const { MongoClient } = require('mongodb')
 const myConsole = require('#commons/myConsole')
 const prompts = require('prompts')
 const _ = require('lodash')
+const parseArguments = require('minimist')
 
-const _USERS = {
-    PREFIX: 'testperfs',
+
+const _LEARNERS = {
+    PREFIX: 'testperfs.learner.',
     PASSWORD: 'seira',
-    ENCRYPTED_PASSWORD: '$2a$10$egusEbUGmahKRCwcLgks1el2DyNJadEbNM57BnouqynHkn5VxZjj.'
+    /** seira */
+    ENCRYPTED_PASSWORD: '$2a$10$egusEbUGmahKRCwcLgks1el2DyNJadEbNM57BnouqynHkn5VxZjj.',
+    GROUPS_PREFIX: 'testperfs.group.learners.',
+    SESSIONS_PREFIX: 'testperfs.session.'
 }
-module.exports.USERS = _USERS
+module.exports.LEARNERS = _LEARNERS
+module.exports.REGEXPS = {
+    LEARNERS_NAMES: new RegExp(`^${_LEARNERS.PREFIX.replaceAll('.', '\\.')}[0-9]*`),
+    /** testperfs.group.startindex.endindex -> learner.name testperfs.learner.startindex to  testperfs.learner.endindex */
+    GROUPS_NAME: new RegExp(`^${_LEARNERS.GROUPS_PREFIX.replaceAll('.', '\\.')}[0-9]+.[0-9]+`),
+    SESSION_NAMES: new RegExp(`^${_LEARNERS.SESSIONS_PREFIX.replaceAll('.', '\\.')}[0-9]+.[0-9]+`)
+}
 const _DBNAMES = {
     SEIRASSO: 'seirasso',
     SEIRADB: 'seiradb',
@@ -57,12 +68,12 @@ module.exports.SEIRASSO_COLLECTIONS = _SEIRASSO_COLLECTIONS
 
 module.exports.SeiraMongoClient = class SeiraMongoClient extends MongoClient {
     #url = null
-
-    constructor(url) {
-        myConsole.highlight(`MongoClient url [${url}]`)
+    #dryrun = null
+    constructor(url, dryrun) {
         super(url)
         this.#url = url
-        this.log(`New MongoClient class[${this.className}] url[${this.url}]`)
+        this.#dryrun = dryrun
+        this.loghighlight(`New MongoClient class[${this.className}] url[${this.url}] dryrun[${this.dryrun}]`)
     }
     get className() {
         return this.constructor.name
@@ -87,6 +98,9 @@ module.exports.SeiraMongoClient = class SeiraMongoClient extends MongoClient {
     }
     get url() {
         return this.#url
+    }
+    get dryrun() {
+        return this.#dryrun
     }
     get seirassoDb() {
         return this.db(_DBNAMES.SEIRASSO);
@@ -124,15 +138,27 @@ module.exports.SeiraMongoClient = class SeiraMongoClient extends MongoClient {
         }
         return response.value == true
     }
+    /**
+     * [{ 
+     *      title: 'Udapdate passwords', 
+     *      description: `For all user.alias.match('/${_LEARNERS.PREFIX}*[0-9]+/') replaces the password by '${_LEARNERS.PASSWORD}'`,
+     *      value: 'updatePwd' 
+     *  }, ...]
+     */
+    get actionChoices() {
+        return []
+    }
     async askAndExecAction() {
+        const actionChoices = this.actionChoices
+        if (actionChoices.length == 0) {
+            this.loghighlight('Empty actionChoices - exit')
+            process.exit(1)
+        }
         let response = await prompts({
             type: 'select',
             name: 'value',
             message: 'Pick an acion',
-            choices: [
-                { title: 'Udapdate passwords', description: `For all user.alias.match('/${_USERS.PREFIX}*[0-9]+/') replaces the password by '${_USERS.PASSWORD}'`, value: 'updatePwd' },
-                { title: 'Update user name', description: `For all user.alias.match('/user[0-9]+/') replaces 'users*' by ${_USERS.PREFIX}*`, value: 'updateUserName' },
-            ],
+            choices: actionChoices,
             initial: null
         })
         if (_.isEmpty(response.value)) {
@@ -167,5 +193,27 @@ module.exports.SeiraMongoClient = class SeiraMongoClient extends MongoClient {
         } finally {
             await this.close()
         }
+    }
+    static async factory() {
+        const minimistOpts = {
+            string: ['url', 'dryrun']
+        }
+        const args = parseArguments(process.argv, minimistOpts)
+        const url = args.url ?? 'mongodb://localhost:27017'
+        const dryrun = args.dryrun ?? 'true'
+        const response = await prompts({
+            type: 'confirm',
+            name: 'value',
+            message: `Confirm DB Url '${url}'`,
+            initial: false
+        })
+        if (response.value !== true) {
+            process.exit(1)
+        }
+        const client = new this(url, dryrun === 'true')
+        myConsole.superhighlight(`dryrun[${dryrun}]`)
+        myConsole.lowlight(`command: npm run mongoRun -- --dryrun false/true (true by default)`)
+        await client.askAndExecAction()
+        return client
     }
 }

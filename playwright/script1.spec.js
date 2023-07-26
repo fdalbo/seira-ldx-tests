@@ -1,6 +1,7 @@
-// @ts-check
+'use strict';
+
 const { test, expect } = require('@playwright/test');
-const { scriptTimeout, runScript } = require('../src/scripts/factory')
+const ScriptRunner= require('../src/scripts/ScriptRunner')
 
 
 /** 
@@ -10,6 +11,6 @@ const { scriptTimeout, runScript } = require('../src/scripts/factory')
  */
 test('RUN SCRIPT1', async ({ page }) => {
   /** https://playwright.dev/docs/test-timeouts */
-  test.setTimeout(scriptTimeout());
-  await runScript('Script1', __filename, page)
+  test.setTimeout(ScriptRunner.scriptTimeout());
+  await ScriptRunner.runScript('Script1', __filename, page)
 });
