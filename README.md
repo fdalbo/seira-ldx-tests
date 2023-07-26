@@ -126,4 +126,14 @@
     }
 }
 ```
-
+- **Utilitaires mongo**
+ - ```_mongo/mongoRun.js``` ```npm run mongoRun -- --dryrun false/true```
+  - **Mise à jour d password après import**
+  - **Création de groupes avec différents lots (10, 50, 100...) d'utilisateurs**
+    - ``testperfs.group.learners.1.10, testperfs.group.learners.11.20, testperfs.group.learners.801.900``
+    - les indexes permettent d'accéder au profils qui composent ce group
+    - ``testperfs.learners.1 -> testperfs.learners.10, testperfs.learners.801 -> testperfs.learners.900``
+- **imports csv**
+ - ``_mongo/users_16_6000.csv`` ``users_base.xlsx``
+ - import par lot de 100 sinon plantage
+ 
