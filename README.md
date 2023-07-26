@@ -85,17 +85,17 @@
     - Ouvrir la console JS dans chromium
     - L'objet playwright permet d'effectuer les tests ``await playwright.locator('#leaner')``
 - **log scripts**
- - environment variable dans ;e fichier xx.dotenv ``SLDX_LOG_DIR_PATH = './_logs/$host/$day/tests'``
- - path pour le worker 5
-    - ``_logs/localhost/2023-07-21/tests/tests.50616.w005.log``
- - Pour conserver les logs ``SLDX_LOG_DIR_REMOVE_FILES=true`` ou utiliser ``$date`` (``SLDX_LOG_DIR_PATH = './_logs/$host/$date/tests'``)
+     - environment variable dans ;e fichier xx.dotenv ``SLDX_LOG_DIR_PATH = './_logs/$host/$day/tests'``
+     - path pour le worker 5
+          - ``_logs/localhost/2023-07-21/tests/tests.50616.w005.log``
+     - Pour conserver les logs ``SLDX_LOG_DIR_REMOVE_FILES=true`` ou utiliser ``$date`` (``SLDX_LOG_DIR_PATH = './_logs/$host/$date/tests'``)
 - **log runner**
- - ``runner.playwright.log``
- - ``runner.artillery.log``
+     - ``runner.playwright.log``
+     - ``runner.artillery.log``
 - **screenshots si erreur playwright**
- - ``_logs/localhost/2023-07-21/tests/screenshots``
+     - ``_logs/localhost/2023-07-21/tests/screenshots``
 - **sMetrics©**
- - ``_logs/localhost/2023-07-21/tests/metrics``
+     - ``_logs/localhost/2023-07-21/tests/metrics``
 - **CaddyFile logging configuration**
 ```
 {
@@ -127,13 +127,13 @@
 }
 ```
 - **Utilitaires mongo**
- - ```_mongo/mongoRun.js``` ```npm run mongoRun -- --dryrun false/true```
-  - **Mise à jour d password après import**
-  - **Création de groupes avec différents lots (10, 50, 100...) d'utilisateurs**
-    - ``testperfs.group.learners.1.10, testperfs.group.learners.11.20, testperfs.group.learners.801.900``
-    - les indexes permettent d'accéder au profils qui composent ce group
-    - ``testperfs.learners.1 -> testperfs.learners.10, testperfs.learners.801 -> testperfs.learners.900``
+     - ```_mongo/mongoRun.js``` ```npm run mongoRun -- --dryrun false/true```
+     - **Mise à jour d password après import**
+     - **Création de groupes avec différents lots (10, 50, 100...) d'utilisateurs**
+          - ``testperfs.group.learners.1.10, testperfs.group.learners.11.20, testperfs.group.learners.801.900``
+          - les indexes permettent d'accéder au profils qui composent ce group
+          - ``testperfs.learners.1 -> testperfs.learners.10, testperfs.learners.801 -> testperfs.learners.900``
 - **imports csv**
- - ``_mongo/users_16_6000.csv`` ``users_base.xlsx``
- - import par lot de 100 sinon plantage
- 
+    - ``_mongo/users_16_6000.csv`` ``users_base.xlsx``
+    - import par lot de 100 sinon plantage
+
