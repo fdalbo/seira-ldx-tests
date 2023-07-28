@@ -105,6 +105,12 @@ module.exports.SeiraMongoClient = class SeiraMongoClient extends MongoClient {
     get seirassoDb() {
         return this.db(_DBNAMES.SEIRASSO);
     }
+    get seiraDb() {
+        return this.db(_DBNAMES.SEIRADB);
+    }
+    async seiraDbCollection(collectionName) {
+        return this.seirassoDb.collection(collectionName)
+    }
     async seirassoCollection(collectionName) {
         return this.seirassoDb.collection(collectionName)
     }

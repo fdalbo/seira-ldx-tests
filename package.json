@@ -14,7 +14,8 @@
     "artillery.script1.debug": "node runner.artillery.js test-script1-debug.yml --sldxenv=debug",
     "playwright.script1": "node runner.playwright.js script1.spec.js",
     "playwright.script1.debug": "node runner.playwright.js script1.spec.js --sldxenv=debug --debug",
-    "mongoRun": "node ./_mongo/mongoRun.js"
+    "mongoRun": "node ./_mongo/mongoRun.js",
+    "initTests.debug": "node runner.node.js ./src/scripts/ScriptTestsInit.js --sldxenv=debug --debug"
   },
   "imports": {
     "#src/*": "./src/*.js",
@@ -27,6 +28,7 @@
   },
   "dependencies": {
     "app-root-dir": "~1.0.2",
+    "axios": "^1.4.0",
     "chalk": "~4.1",
     "clone": "~2.1.2",
     "dateformat": "~4.6",

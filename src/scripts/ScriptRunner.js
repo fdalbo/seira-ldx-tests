@@ -475,6 +475,7 @@ exports.ScriptRunner = class ScriptRunner {
             }
             this.log(`BEGIN RUN ${this.name}`)
             this.log(`SLDX Variables:\n${traceEnv.sort().join('\n')}\n`)
+            await this.beforeLogin()
             await this.login()
             await this.afterLogin()
             await this.beforeEnd()
@@ -506,6 +507,10 @@ exports.ScriptRunner = class ScriptRunner {
         const progress = await this.locator('app-progress-bar .percentage-progression').innerHTML()
         this.logHighlight(`Progession [${progress}]`)
         return progress
+    }
+    
+    async beforeLogin() {
+        this.logHighlight(`beforeLogin`)
     }
     async afterLogin() {
         this.logHighlight(`afterLogin`)

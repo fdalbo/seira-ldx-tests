@@ -1,0 +1,24 @@
+{
+    "session": {
+        "_id": null,
+        "title": "testperfs.session.1_100",
+        "publishedCareer": "64b2d4b95c29e540bc1ab93a",
+        "headTeachers": null,
+        "coaches": [
+            "64b543d215765cb9111d8aed"
+        ],
+        "startDate": "2023-07-28T00:00:00.000Z",
+        "endDate": "2023-08-03T23:59:59.999Z",
+        "learners": {
+            "individualUserIds": [],
+            "groupIds": [
+                "64c11f9e342e5ef526cbfe79"
+            ]
+        },
+        "color": null,
+        "cardsToUnlockInfo": [],
+        "unlockedCards": [],
+        "accessDayTimeIntervals": [],
+        "secondaryCoaches": []
+    }
+}

@@ -4,8 +4,6 @@ SLDX_WORK_DIR_PATH = './_workdir/$host/$day/tests'
 SLDX_PROXY_PROTOCOL = 'http'
 SLDX_PROXY_HOST = 'localhost'
 SLDX_PROXY_PORT= '2020'
-SLDX_ADMIN_ID = 'admin'
-SLDX_ADMIN_PWD = 'admin'
 # the user used by artillery will be user8 (7+1)
 SLDX_ARTILLERY_USER_FIRST_IDX = '7'
 SLDX_PLAYWRIGHT_USER=user1

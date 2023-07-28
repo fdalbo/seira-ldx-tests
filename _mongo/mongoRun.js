@@ -6,7 +6,7 @@ const {
     LEARNERS,
     REGEXPS,
     SeiraMongoClient
-} = require('./helpers')
+} = require('#helpers/mongo')
 
 const _ = require('lodash')
 
