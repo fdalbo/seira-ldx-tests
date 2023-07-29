@@ -1,0 +1,51 @@
+[
+    {
+        "key": "fromId",
+        "type": "text",
+        "value": "64ae7420c20f828c07357510"
+    },
+    {
+        "key": "title",
+        "type": "text",
+        "value": "TESTPERFS.SESSION"
+    },
+    {
+        "key": "coaches",
+        "type": "text",
+        "value": "testperfs.teacher TESTPERFS.TEACHER"
+    },
+    {
+        "key": "coachIds",
+        "type": "array",
+        "value": [
+            "64b543d215765cb9111d8aed"
+        ]
+    },
+    {
+        "key": "description",
+        "type": "text",
+        "value": "<p style=\"text-align: center;\">&nbsp;</p>\n<p style=\"text-align: center;\">&nbsp;</p>\n<p style=\"text-align: center;\"><span style=\"color: rgb(132, 63, 161);\"><strong>D&eacute;but du parcous de test de performances scenario 1</strong></span></p>\n<p style=\"text-align: center;\">&nbsp;</p>\n<p style=\"text-align: center;\">&nbsp;</p>\n<p style=\"text-align: center;\">&nbsp;</p>"
+    },
+    {
+        "key": "startDate",
+        "type": "date",
+        "value": "2023-07-29T00:00:00.000Z"
+    },
+    {
+        "key": "endDate",
+        "type": "date",
+        "value": "2023-08-04T23:59:59.999Z"
+    },
+    {
+        "key": "receivers",
+        "type": "select",
+        "value": [
+            "64b543d215765cb9111d8aed"
+        ]
+    },
+    {
+        "key": "accessTimeIntervals",
+        "type": "text",
+        "value": "7j/7 24h/24"
+    }
+]

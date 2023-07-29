@@ -110,7 +110,7 @@ const _baseConfig = {
     }
 }
 const _initConfig = (scriptId) => {
-    if (!['artillery', 'playwright'].includes(process.env.SLDX_RUNNER_EXEC)) {
+    if (!['artillery', 'playwright', 'node' ].includes(process.env.SLDX_RUNNER_EXEC)) {
         throw new Error(`Unknown value for SLDX_RUNNER_EXEC [${process.env.SLDX_RUNNER_EXEC}]`)
     }
     const testEnv = process.env[SLDX_ENV_VAR] ?? ''
@@ -132,9 +132,11 @@ const _initConfig = (scriptId) => {
     }
     const configPath = path.resolve(appRootDir.get(), fileNameScript)
     if (!fs.existsSync(configPath)) {
-        throw new Error(`Script [${scriptId}] - Config file not found\n- [[${configPath}]`)
+        throw new Error(`Script [${scriptId}] - Config file not found\n- [${configPath}]`)
     }
     _config = deepmerge(_baseConfig, require(configPath))
+    _config.scriptId =scriptId
+    _config.configPath =configPath
     myConsole.highlight(`Config Path: [${configPath}]`)
     myConsole.lowlight(`Config:\n${prettyFormat(_config)}\n©`)
     return _config

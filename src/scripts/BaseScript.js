@@ -2,19 +2,38 @@ const myConsole = require('#commons/myConsole')
 const prompts = require('prompts')
 const _ = require('lodash')
 const parseArguments = require('minimist')
+const appRootDir = require('app-root-dir')
+const {
+    initConfig
+} = require(`${appRootDir.get()}/config.base`)
 
 
-module.exports= class BaseScript {
-    #dryrun = null
-    constructor(dryrun) {
-        this.#dryrun = dryrun
-        this.loghighlight(`New MongoClient class[${this.className}] dryrun[${this.dryrun}]`)
+module.exports = class BaseScript {
+    #scriptConfig = null
+    #opts = null
+    constructor(opts) {
+        this.#opts = Object.assign({
+            dryrun: true,
+            scriptId: null
+        }, opts ?? {})
+        this.loghighlight(`New [${this.className}] dryrun[${this.dryrun}]`)
+        this.#scriptConfig = _.isEmpty(opts.scriptId) ? null : initConfig(opts.scriptId)
+        this.log()
     }
     get className() {
         return this.constructor.name
     }
+    get scriptConfig() {
+        return this.#scriptConfig
+    }
+    get opts() {
+        return this.#opts
+    }
+    set dryrun(dryrun) {
+        this.#opts.dryrun = dryrun == true
+    }
     get dryrun() {
-        return this.#dryrun
+        return this.#opts.dryrun === true
     }
     log(...args) {
         this.loglowlight.apply(this, args)
@@ -57,57 +76,63 @@ module.exports= class BaseScript {
     get actionChoices() {
         return []
     }
-    async askAndExecAction() {
+    async askAndExecAction(confirm = false) {
         const actionChoices = this.actionChoices
         if (actionChoices.length == 0) {
             this.loghighlight('Empty actionChoices - exit')
             process.exit(1)
         }
-        let response = await prompts({
+        const reponse = await prompts({
             type: 'select',
             name: 'value',
             message: 'Pick an acion',
             choices: actionChoices,
             initial: null
         })
-        if (_.isEmpty(response.value)) {
+        if (_.isEmpty(reponse.value)) {
             this.loghighlight(`Operation canceled - exit process`)
             process.exit(1)
         }
-        const method = this[response.value]
+        const actionChoice = actionChoices.find (x=>x.value === reponse.value)
+        this.log(JSON.stringify(actionChoice))
+        const method = this[actionChoice.value]
         if (!_.isFunction(method)) {
-            client.loghighlight(`Mongoclient does not provide '${response.value}' method - Exit process`)
+            client.loghighlight(`Mongoclient does not provide '${actionChoice.value}' method - Exit process`)
             process.exit(1)
         }
-        await this.confirm(`Confirm action '${response.value}'`)
-        await this.run(method)
+        confirm === true && await this.confirm(`Confirm action '${actionChoice.value}'`)
+        await this.run.apply(this, [method, ...actionChoice.args ?? []])
     }
-    async runBefore() {
+    async runBefore(method, ...args) {
     }
-    async runAfter() {
+    async runAfter(method, ...args) {
     }
-    async runError(e) {
+    async runError(e, method, ...argse) {
     }
     async run(method, ...args) {
         try {
             this.logsuperhighlight(`${method.name} BEGIN`)
-            await this.runBefore()
+            myConsole.initLoggerFromModule(method.name)
+            this.log(JSON.stringify(args))
+            await this.runBefore.apply(this, [method, ...args])
             await method.apply(this, args)
-            await this.runAfter()
+            await this.runAfter.apply(this, [method, ...args])
             this.logsuperhighlight(`${method.name} END`)
         } catch (e) {
             this.logerror(`${method.name} FAILED`, e)
-            await this.runError(e)
+            await this.runError.apply(this, [e, method, ...args])
         }
     }
-    static async factory() {
+    static async factory(opts) {
         const minimistOpts = {
             string: ['dryrun']
         }
         const args = parseArguments(process.argv, minimistOpts)
         const dryrun = args.dryrun ?? 'true'
-        const client = new this(dryrun === 'true')
-        myConsole.superhighlight(`dryrun[${dryrun}]`)
+        const client = new this(Object.assign({
+            dryrun: dryrun === 'true'
+        }, opts ?? {}))
+        myConsole.superhighlight(`dryrun[${client.dryrun}]`)
         return client
     }
 }

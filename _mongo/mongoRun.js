@@ -19,7 +19,7 @@ class MyClient extends SeiraMongoClient {
     #profilesCollection = null
     #groupsCollection = null
 
-    async runBefore() {
+    async runBefore(method, ...args) {
         this.#loginCollection = await this.seirassoCollection(SEIRASSO_COLLECTIONS.LOGINS)
         this.#profilesCollection = await this.seirassoCollection(SEIRASSO_COLLECTIONS.PROFILES)
         this.#groupsCollection = await this.seirassoCollection(SEIRASSO_COLLECTIONS.GROUPS)

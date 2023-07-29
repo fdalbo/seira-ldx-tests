@@ -4,7 +4,10 @@ module.exports = {
      * small timeout compared to config.script1 for debug
      */
     scenario:{
-        sessionName: 'testperfs',
+        sessionName: 'testperfs.session',
+        sessionNbLearners: 200,
+        teacherName:'testperfs.teacher',
+        publishedCareerName:'testperfs.career',
         nbLoopQuiz1: 10,
         nbLoopQuiz2: 10,
         nbLoopQuiz3: 10
