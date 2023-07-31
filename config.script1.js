@@ -1,10 +1,9 @@
 
 module.exports = {
-
+    sessions:{
+        mainNbLearners: 200
+    },
     scenario:{
-        sessionName: 'testperfs',
-        sessionNbLearners: 200,
-        teacherName:'testperfs.teacher',
         nbLoopQuiz1: 100,
         nbLoopQuiz2: 100,
         nbLoopQuiz3: 100

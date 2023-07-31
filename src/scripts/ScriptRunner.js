@@ -6,7 +6,7 @@ const path = require('path')
 const _ = require('lodash')
 const appRootDir = require('app-root-dir')
 const Stats = require('stats-incremental')
-const CSVStream = require('./CsvStream')
+const CSVStream = require('#helpers/CsvStream')
 const {
     isMainThread,
     parentPort: _workerParentPort,
@@ -138,7 +138,7 @@ const _CLICKABLE = {
 
     }
 }
-exports.ScriptRunner = class ScriptRunner {
+module.exports = class ScriptRunner {
     stepIdx = 0
     name = null
     pwPage = null
@@ -156,7 +156,7 @@ exports.ScriptRunner = class ScriptRunner {
         this.config = initConfig(this.className.toLowerCase())
         this.scenario = this.config.scenario ?? {}
         this.learnerId = this.config.getUserId()
-        this.learnerRole = this.config?.users?.learner?.role ?? 'empty'
+        this.learnerRole = this.config?.entities?.learner?.role ?? 'empty'
         /** see https://playwright.dev/docs/api/class-page#page-set-default-navigation-timeout  */
         pwPage.setDefaultNavigationTimeout(this.config.timeouts.defaultNavigationTimeout ?? 1000)
         /** seehttps://playwright.dev/docs/api/class-page#page-set-default-timeout */
@@ -531,55 +531,6 @@ exports.ScriptRunner = class ScriptRunner {
     async initTestContext(){
 
     }
-    async removeSession(){
-
-    }
-    async createSession(){
-        /*
-
-Request URL:
-http://seira-ldx.seiralocaltest/server/api/careers-publish-sessions
-Request Method:
-PUT
-Status Code:
-200 OK
-
-{
-   "session":{
-      "_id":null,
-      "title":"testperfs",
-      "publishedCareer":"64ae803cc20f828c07357608",
-      "headTeachers":null,
-      "coaches":[
-         "64b543d215765cb9111d8aed"
-      ],
-      "startDate":"2023-07-24T00:00:00.000Z",
-      "endDate":"2023-07-30T23:59:59.999Z",
-      "learners":{
-         "individualUserIds":[
-            
-         ],
-         "groupIds":[
-            "64b2d5ea5c29e540bc1aba4e"
-         ]
-      },
-      "color":null,
-      "cardsToUnlockInfo":[
-         
-      ],
-      "unlockedCards":[
-         
-      ],
-      "accessDayTimeIntervals":[
-         
-      ],
-      "secondaryCoaches":[
-         
-      ]
-   }
-}
-        */
-    }
     /**
      * @returns the runner
      */
@@ -591,26 +542,23 @@ Status Code:
     static async runScript(scriptFilePath, pwPage) {
         let runError = null
         try {
-            const name = path.basename(scriptFilePath)
-            myConsole.initLoggerFromModule(name)
-            myConsole.superhighlight(`BEGIN RUN ${className}`)
+            const scriptName = path.basename(scriptFilePath)
+            myConsole.initLoggerFromModule(scriptName)
+            myConsole.superhighlight(`BEGIN RUN ${this.name}`)
             myConsole.lowlight(`From [${scriptFilePath}]`)
             if (_.isEmpty(process.env.SLDX_RUNNER_EXEC)) {
                 myConsole.warning(`\n\nProcess must be launched by the runner\n- npm run artillery.script1 --  --sldxenv=playwright.debug\n- npm run playwright.script1 --  --sldxenv=playwright.debug --sldxpwuser=user4 --debug\n\n`)
                 throw new Error(`Process must be launched by the runner`)
             }
-            const klass = _classes.find(x => x.name === className)
-            if (klass == null) {
-                throw new Error(`Script Class [${className}] not found`)
-            }
-            const script = klass.factory(scriptFilePath, pwPage)
-            await script.run()
+            const runner = new this(scriptFilePath, pwPage)
+            await runner.asyncInit()
+            await runner.run()
         } catch (e) {
-            myConsole.error(`Error running ${className}`, e)
+            myConsole.error(`Error running ${this.className}`, e)
             runError = true
             throw e
         } finally {
-            myConsole.superhighlight(`END RUN ${runError ? 'KO' : 'OK'} ${className}`)
+            myConsole.superhighlight(`END RUN ${runError ? 'KO' : 'OK'} ${this.className}`)
         }
     }
     static scriptTimeout() {

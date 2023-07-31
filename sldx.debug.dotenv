@@ -1,9 +1,1 @@
-SLDX_LOG_LEVEL = 'debug'
-SLDX_LOG_DIR_PATH = './_logs/$host/$day/tests'
-SLDX_WORK_DIR_PATH = './_workdir/$host/$day/tests'
-SLDX_PROXY_PROTOCOL = 'http'
-SLDX_PROXY_HOST = 'localhost'
-SLDX_PROXY_PORT= '2020'
 # the user used by artillery will be user8 (7+1)
-SLDX_ARTILLERY_USER_FIRST_IDX = '7'
-SLDX_PLAYWRIGHT_USER=user1

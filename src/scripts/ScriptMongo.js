@@ -1,18 +1,19 @@
 'use strict';
 
 const chalk = require('chalk');
+const { format: prettyFormat } = require('pretty-format')
+const _ = require('lodash')
+const assert = require('assert')
+const escapeRegExp = require('escape-string-regexp')
+const myConsole = require('#commons/myConsole')
 const {
     SEIRASSO_COLLECTIONS,
-    LEARNERS,
-    REGEXPS,
-    SeiraMongoClient
-} = require('#helpers/mongo')
+    SeiraMongoClient,
+} = require('./MongoClientSeira')
 
-const _ = require('lodash')
 
 /**
- * COMMAND: node ./_mongo/mongoClient.js --url mongodb://host:port
- * Default url is mongodb://localhost:27017
+ * COMMAND: node ./_mongo/mongoClient.js --sldxenv script1
  */
 class MyClient extends SeiraMongoClient {
     #loginCollection = null
@@ -36,22 +37,40 @@ class MyClient extends SeiraMongoClient {
     }
     get actionChoices() {
         return [
-            { title: 'Update password after import', description: `For all logins.login.match('/${LEARNERS.PREFIX}[0-9]+/') with NOT_DEFINED paswword replaces the password by '${LEARNERS.PASSWORD}' (encrypted)`, value: this.updatePwdImportedLearners.name },
+            { title: 'testEntities', description: `testEntities`, value: this.testEntities.name },
+            { title: 'Update password after import', description: `For all learners' passwords NOT_DEFINED by '${this.scriptConfig.entities.learner.password}' (encrypted)`, value: this.updatePwdImportedLearners.name },
             //  { title: 'fixNameAsDateIssue', description: `fixNameAsDateIssue`, value: this.fixNameAsDateIssue.name },
             { title: 'createGroups', description: `Creates groups testperfs.group.startidx.stopidx with 50, 10, 20.. users`, value: this.createGroups.name },
         ]
     }
+    async profilesSearchByName(regexp) {
+        return this.profilesCollection
+            .find({ name: { $regex: regexp, '$options': 'i' } })
+            .toArray()
+            .then((array) => {
+                this.log(`profilesCollection regexp[${regexp}] count[${array.length}]`)
+                return array
+            })
+    }
     async getLearnerProfiles() {
-        this.log(REGEXPS.LEARNERS_NAMES)
-        return this.profilesCollection.find({ name: { $regex: REGEXPS.LEARNERS_NAMES, '$options': 'i' } }).toArray()
+        return this.profilesSearchByName(this.regExpLearners)
     }
     async getLearnerGroups() {
-        this.log(REGEXPS.GROUPS_NAME)
-        return this.groupsCollection.find({ name: { $regex: REGEXPS.GROUPS_NAME, '$options': 'i' } }).toArray()
+        return this.groupsCollection.find({ name: { $regex: this.regExpGroups, '$options': 'i' } })
+            .toArray()
+            .then((array) => {
+                this.log(`groupsCollection regexp[${this.regExpGroups}] count[${array.length}]`)
+                return array
+            })
     }
     async getLearnerLogins() {
-        this.log(REGEXPS.LEARNERS_NAMES)
-        return this.loginCollection.find({ login: { $regex: REGEXPS.LEARNERS_NAMES, '$options': 'i' } }).toArray()
+        return this.loginCollection
+            .find({ login: { $regex: this.regExpLearners, '$options': 'i' } })
+            .toArray()
+            .then((array) => {
+                this.log(`loginCollection regexp[${this.regExpLearners}] count[${array.length}]`)
+                return array
+            })
     }
     async updateOne(collection, doc, data) {
         if (_.isEmpty(data)) {
@@ -70,14 +89,28 @@ class MyClient extends SeiraMongoClient {
             })
         }
     }
+    async testEntities() {
+        const profiles = await this.getLearnerProfiles()
+        const teachers = await this.profilesSearchByName(new RegExp(`^${escapeRegExp(this.scriptConfig.entities.teacher.name)}`))
+        const admins = await this.profilesSearchByName(new RegExp(`^${escapeRegExp(this.scriptConfig.entities.admin.name)}`))
+        this.log('testEntities', prettyFormat({
+            teachers: teachers,
+            admin: admins,
+            learners: {
+                count: profiles.length,
+                array: profiles.slice(0, 2).concat('...')
+            }
+        }))
+    }
     async updatePwdImportedLearners() {
-        const docs = await this.getLearnerLogins().toArray()
+        const docs = await this.getLearnerLogins()
         this.log(`loginCollection.docs.length[${docs.length}]`)
         let modifiedCount = 0
+        assert(!_.isEmpty(this.scriptConfig.entities.learner.encryptedPwd), 'Unexpected encrypted password [config.learner.encryptedPwd]')
         for await (const doc of docs) {
             if (doc.password === 'NOT_DEFINED') {
                 const result = await this.updateOne(this.loginCollection, doc, {
-                    password: LEARNERS.ENCRYPTED_PASSWORD
+                    password: this.scriptConfig.entities.learner.encryptedPwd
                 })
                 modifiedCount += result.modifiedCount
             }
@@ -86,7 +119,7 @@ class MyClient extends SeiraMongoClient {
     }
 
     async fixNameAsDateIssue() {
-        const profilesOk = await this.profilesCollection.find({ name: { $regex: REGEXPS.LEARNERS_NAMES, '$options': 'i' } }).toArray()
+        const profilesOk = await this.profilesCollection.find({ name: { $regex: this.regExpLearners, '$options': 'i' } }).toArray()
         this.log(`profilesOk[${profilesOk.length}]`)
         let idx = profilesOk.length
         const profilesKo = await this.profilesCollection.find({ name: { $type: 'date' } }).toArray()
@@ -95,7 +128,7 @@ class MyClient extends SeiraMongoClient {
         let modifiedProfiles = 0, modifiedLogins = 0
         for await (const loginKo of loginsKo) {
             idx++
-            const newName = `${LEARNERS.PREFIX}${idx}`
+            const newName = `${this.scriptConfig.entities.learner.prefix}${idx}`
             const profileKo = profilesKo.find(x => x._id == loginKo.profileId)
             if (!profileKo) {
                 this.logwarning(`no profile for login ${loginKo.login} profileId[${loginKo.profileId}]`)
@@ -171,7 +204,7 @@ class MyClient extends SeiraMongoClient {
         for await (const indexes of learnersIndexes) {
             const startIdx = indexes[0]
             const stopIdx = indexes[1]
-            const groupeName = `${LEARNERS.GROUPS_PREFIX}${startIdx}.${stopIdx}`
+            const groupeName = `${this.scriptConfig.entities.group.prefix}${startIdx}.${stopIdx}`
             const errors = []
             const group = groups.find(g => g.name === groupeName)
             const expectedProfiles = stopIdx - startIdx + 1
@@ -183,7 +216,7 @@ class MyClient extends SeiraMongoClient {
                     profileIds: []
                 }
                 for (let learnerIdx = startIdx; learnerIdx <= stopIdx; learnerIdx++) {
-                    const learnerName = `${LEARNERS.PREFIX}${learnerIdx}`
+                    const learnerName = `${this.scriptConfig.entities.learner.prefix}${learnerIdx}`
                     const profile = await profiles.find(p => p.name === learnerName)
                     if (!profile) {
                         errors.push(`Group[${groupeName}] - No profile found with name '${learnerName}'`)
@@ -237,6 +270,15 @@ class MyClient extends SeiraMongoClient {
 }
 
 (async () => {
-    await MyClient.factory()
+    try {
+        const cli = await MyClient.factory({
+            scriptId: 'script1'
+        })
+        await cli.askAndExecAction()
+    } catch (e) {
+        myConsole.error('Error running script', __filename, e);
+    } finally {
+        process.exit(0)
+    }
 })()
 

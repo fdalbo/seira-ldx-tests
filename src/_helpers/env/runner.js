@@ -13,6 +13,7 @@ const dotenv = require('dotenv')
 const myConsole = require('#commons/myConsole')
 const _ = require('lodash')
 const dateFormat = require('dateformat')
+const { format: prettyFormat } = require('pretty-format')
 const { pause } = require('#commons/promises')
 const { ARGS_PREFIX, readSldxEnv, readProccessArgument } = require('#env/defaultEnvVars')
 const { traceVariables, initEnvVars } = require('#env/initEnvVars')
@@ -152,12 +153,28 @@ module.exports = async function (mainScriptPath, additionalEnvVars, options) {
         _setRunnerEnvVar(environmentVariables, 'SLDX_RUNNER_SCRIPT_NAME', scriptName)
         /** node, artillery, playwright */
         _setRunnerEnvVar(environmentVariables, 'SLDX_RUNNER_EXEC', options.exec)
+        let res = {
+            command: null,
+            escapedCommand: null,
+            exitCode: null,
+            stdout: null,
+            stderr: null,
+            all: null,
+            failed: null,
+            timedOut: null,
+            isCanceled: null,
+            killed: null,
+        }
         try {
             /** ALl variables befroe running the command */
             traceVariables(environmentVariables)
             const modeShell = os.platform() == 'linux'
-            //execa.execaSync(process.execPath, childProcessArgs, {
-            const { stdout, stderr } = await execa(exec, childProcessArgs, {
+            const result = await execa(exec, childProcessArgs, {
+                /**
+                 * No error on ctrl C
+                 * try catch must be done in scriptToRunFullPath
+                 */
+                reject: false,
                 stdio: [process.stdin, process.stdout, process.stderr],
                 /** Environment variables are passed to the child process by default */
                 env: process.env,
@@ -175,7 +192,13 @@ module.exports = async function (mainScriptPath, additionalEnvVars, options) {
                  */
                 shell: modeShell
             })
+            if (result.exitCode!=0){
+                myConsole.superhighlight(`Command exited with code [${result.exitCode}]`)
+                process.exit(result.exitCode)
+            }
         } catch (e) {
+            console.log('subprocess', prettyFormat(res))
+            console.log('excp', prettyFormat(e))
             /** 
              * The original cause thrown by the script is not present (e.cause)
              * --> We need to put a ty{}catch (e) {myConsole.error("ERROR", e)} in the script

@@ -1,90 +1,29 @@
+'use strict';
 
 const axios = require('axios')
 const _ = require('lodash')
 const BaseScript = require('./BaseScript')
 const { format: prettyFormat } = require('pretty-format')
 const chalk = require('chalk')
-
-// http://seira-ldx.seiralocaltest/alerting/api/system/session-learner-added
-const ff = [
-    {
-        "key": "fromId",
-        "type": "text",
-        "value": "64ae7420c20f828c07357510"
-    },
-    {
-        "key": "title",
-        "type": "text",
-        "value": "TESTPERFS.SESSION"
-    },
-    {
-        "key": "coaches",
-        "type": "text",
-        "value": "testperfs.teacher TESTPERFS.TEACHER"
-    },
-    {
-        "key": "coachIds",
-        "type": "array",
-        "value": [
-            "64b543d215765cb9111d8aed"
-        ]
-    },
-    {
-        "key": "description",
-        "type": "text",
-        "value": "<p style=\"text-align: center;\">&nbsp;</p>\n<p style=\"text-align: center;\">&nbsp;</p>\n<p style=\"text-align: center;\"><span style=\"color: rgb(132, 63, 161);\"><strong>D&eacute;but du parcous de test de performances scenario 1</strong></span></p>\n<p style=\"text-align: center;\">&nbsp;</p>\n<p style=\"text-align: center;\">&nbsp;</p>\n<p style=\"text-align: center;\">&nbsp;</p>"
-    },
-    {
-        "key": "startDate",
-        "type": "date",
-        "value": "2023-07-29T00:00:00.000Z"
-    },
-    {
-        "key": "endDate",
-        "type": "date",
-        "value": "2023-08-04T23:59:59.999Z"
-    },
-    {
-        "key": "receivers",
-        "type": "select",
-        "value": [
-            "64afed29f818a7ee5ebb444c",
-            "64b2d8665c29e540bc1aba63",
-            "64b2d8a65c29e540bc1aba68",
-            "64b2d8e85c29e540bc1aba6d",
-            "64b2d9325c29e540bc1aba72",
-            "64b7e6a54aa44f95adb480f6",
-            "64b7e6c24aa44f95adb480fb",
-            "64b7e6f64aa44f95adb48100",
-            "64b7e76c4aa44f95adb48105",
-            "64b7e7814aa44f95adb4810a"
-        ]
-    },
-    {
-        "key": "accessTimeIntervals",
-        "type": "text",
-        "value": "7j/7 24h/24"
-    }
-]
+const assert = require('assert')
 
 // http://seira-ldx.seiralocaltest/alerting/api/system/session-head-teacher-added
-const _getSessionData = ({ sessionName, careerId, teacherId, learnerIds, groupIds }) => {
-    learnerIds ??= []
+const _getSessionData = ({ sessionName, careerId, coaches, individualUserIds, groupIds }) => {
+    individualUserIds ??= []
     groupIds ??= []
+    coaches ??= []
     return {
         session: {
             _id: null,
             title: sessionName,
             publishedCareer: careerId,
             headTeachers: null,
-            coaches: [
-                teacherId
-            ],
+            coaches: [...coaches],
             startDate: new Date().toISOString(),
             endDate: (() => { const d = new Date(); d.setHours(30 * 24); return d.toISOString() })(),
             learners: {
-                groupIds: groupIds,
-                individualUserIds: [...learnerIds],
+                groupIds: [...groupIds],
+                individualUserIds: [...individualUserIds],
             },
             color: '#9c27b0',
             cardsToUnlockInfo: [],
@@ -101,25 +40,29 @@ const _methodColor = {
     delete: chalk.magentaBright('delete')
 }
 
-const _defSessionName = ''
-const _validHtpStatus = [200, 201, 404]
+const _okHtpStatus = [200, 201]
+const _validHtpStatus = [404, ..._okHtpStatus]
 module.exports = class ApiCli extends BaseScript {
-    baseUrl = null
-    baseUrlSso = null
-    httpCli = null
+    #httpCli = null
+    #httpCliSso = null
+    #profiles = null
     constructor(opts) {
         super(opts)
-        // this.baseUrl = process.env.SLDX_PROXY_URL
-        this.baseUrl = 'http://seira-ldx.seiralocaltest'
-        this.baseUrlSso = 'http://localhost:3010'
+        assert(!_.isEmpty(this.baseUrl), 'Empty baseUrl')
+        assert(!_.isEmpty(this.baseUrlSso), 'Empty baseUrlSso')
         this.loghighlight(`baseUrl[${this.baseUrl}] baseUrlSso[${this.baseUrlSso}]`)
+        this.#httpCliSso = axios.create({
+            baseURL: this.baseUrlSso,
+            timeout: this.scriptConfig.apiCli.timeout,
+            validateStatus: () => true
+        })
     }
-    createHttpCli(bearerToken, timeout = 1000) {
+    createHttpCli(bearerToken) {
         this.loghighlight(`\nCreate http client`)
         this.log(`Token: ${bearerToken}`)
-        this.httpCli = axios.create({
+        this.#httpCli = axios.create({
             baseURL: this.baseUrl,
-            timeout: timeout,
+            timeout: this.scriptConfig.apiCli.timeout,
             headers: {
                 Authorization: `Bearer ${bearerToken}`
             },
@@ -127,6 +70,12 @@ module.exports = class ApiCli extends BaseScript {
                 return true /** all staus are processed by the caller */
             }
         })
+    }
+    get httpCli() {
+        return this.#httpCli
+    }
+    get httpCliSso() {
+        return this.#httpCliSso
     }
     /**
      * @param {object} callArgs 
@@ -154,7 +103,7 @@ module.exports = class ApiCli extends BaseScript {
                 const promises = []
                 for (let batchIdx = 0; batchIdx < batchSize && mainIdx < callsArgs.length; batchIdx++) {
                     const arg = callsArgs[mainIdx]
-                    promises.push(this.callHttpCli(arg.method, arg.path, arg.data))
+                    promises.push(this.callProxyHttp(arg.method, arg.path, arg.data))
                     mainIdx += 1
                 }
                 const promisesResult = await Promise.all(promises)
@@ -172,20 +121,19 @@ module.exports = class ApiCli extends BaseScript {
         return [
             { title: 'Get groups', description: `Get groups`, value: this.groups.name },
             { title: 'Get sessions', description: `Get sessions`, value: this.sessions.name },
-            { title: 'Get profiles', description: `Get profiles`, value: this.profiles.name },
+            { title: 'splitProfiles', description: `splitProfiles`, value: this.splitProfiles.name },
             { title: 'Get carrersPublished', description: `Get carrersPublished`, value: this.carrersPublished.name },
             { title: 'deleteAllSession', description: `deleteAllSession`, value: this.deleteAllSession.name },
-            {
-                title: 'createSession', description: `createSession`, value: this.createSession.name, args: [{
-                    sessionName: this.scriptConfig.scenario.sessionName,
-                    sessionNbLearners: this.scriptConfig.scenario.sessionNbLearners,
-                    teacherName: this.scriptConfig.scenario.teacherName,
-                    publishedCareerName: this.scriptConfig.scenario.publishedCareerName
-                }]
-            },
-            { title: 'deleteSessionByName', description: `deleteSessionByName`, value: this.deleteSessionByName.name, args: [this.scriptConfig.scenario.sessionName] },
+            { title: 'createTestSession', description: `creates test script session`, value: this.createTestSession.name },
+            { title: 'deleteTestSession', description: `delete test script session`, value: this.deleteSessionByName.name, args: [this.scriptConfig.entities.session.mainName] },
             // { title: 'Login admin', description: `Login admin`, value: this.login.name }
         ]
+    }
+    get baseUrl() {
+        return this.scriptConfig.proxyUrl
+    }
+    get baseUrlSso() {
+        return this.scriptConfig.ssoUrl
     }
     getFullUrl(path) {
         return `${this.baseUrl}${path}`
@@ -196,27 +144,29 @@ module.exports = class ApiCli extends BaseScript {
      * @param  {...any} args 
      * @returns null if 404
      */
-    async callHttpCli(method, path, ...args) {
+    async #callHttpCli(httpCli, method, path, ...args) {
         if (this.dryrun) {
             this.log(`${chalk.yellow('dryrun')}\n${_methodColor[method]}[${path}]`)
+            this.log(`${chalk.yellow('!!No result')}\n`)
             return {}
         }
-        this.log(`${_methodColor[method]}[${path}]`)
-        if (!this.httpCli) {
-            throw new Error('Unexpected empty http client')
-        }
-        const { status, data } = await this.httpCli[method].apply(this.httpCli, [path, ...args])
+        this.log(`[${httpCli == this.#httpCli ? 'proxy' : 'sso'}] ${_methodColor[method]}[${httpCli.defaults.baseURL}${path}]`)
+
+        this.log(prettyFormat(args))
+        assert(httpCli != null, 'Unexpected empty http client')
+        const { status, data } = await httpCli[method].apply(httpCli, [path, ...args])
         /** fails if status is no included in _validHtpStatus*/
-        this.log(`status[${[200, 201].includes(status) ? chalk.green(status) : chalk.red(status)}]`)
+        this.log(`status[${_okHtpStatus.includes(status) ? chalk.green(status) : chalk.red(status)}]`)
         if (!_validHtpStatus.includes(status)) {
             this.logerror(`http status ${status}`)
             this.log(prettyFormat(data))
             throw new Error(`http status ${status}`)
-        } else if (status != 404) {
+        }
+        if (status != 404) {
             let display
             if (_.isArray(data)) {
                 /** Some requests return an array instead of an object */
-                display = data.slice(0, 1).concat('...')
+                display = data.slice(0, 1).concat(`length[${data.length}]`).concat('...')
             } else {
                 display = data
                 if (data.result && _.isArray(data.result)) {
@@ -229,19 +179,26 @@ module.exports = class ApiCli extends BaseScript {
         this.log()
         return status == 404 ? null : data
     }
-    async get(path) {
-        return await this.callHttpCli('get', path)
+    async callProxyHttp(...args) {
+        return this.#callHttpCli.apply(this, [this.httpCli, ...args])
     }
-    async delete(path, id) {
-        return await this.callHttpCli('delete', `${path}${id}`)
+    async callSsoHttp(...args) {
+        return this.#callHttpCli.apply(this, [this.httpCliSso, ...args])
+    }
+    async get(path) {
+        return await this.callProxyHttp('get', path)
+    }
+    async delete(path, id, ...args) {
+        assert(!_.isEmpty(id), 'empty id')
+        return await this.callProxyHttp('delete', [path, id, ...args].join('/'))
     }
     async post(path, data) {
         // this.log(`post[${path}] data\n${JSON.stringify(data, null, 2)}`)
-        return await this.callHttpCli('post', path, data)
+        return await this.callProxyHttp('post', path, data)
     }
     async put(path, data) {
         // this.log(prettyFormat(data))
-        return await this.callHttpCli('put', path, data)
+        return await this.callProxyHttp('put', path, data)
     }
     getSsoCollection(path) {
         return this.get(`/generic-db-api/api/collections/seirasso${path}`)
@@ -262,6 +219,40 @@ module.exports = class ApiCli extends BaseScript {
     async profiles() {
         return await this.getSsoCollection('/Profile/*/10000/$limit')
     }
+    async splitProfiles() {
+        const teacherName = this.scriptConfig.entities.teacher.name
+        const adminName = this.scriptConfig.entities.admin.name
+        const learnerPrefix = this.scriptConfig.entities.learner.prefix
+        this.#profiles = {
+            admin: null,
+            teacher: null,
+            learners: new Map(),
+            learnerIds: []
+        }
+        const profiles = await this.profiles()
+        for (const profile of profiles.result) {
+            if (this.#profiles.teacher == null && teacherName == profile.name) {
+                this.#profiles.teacher = profile
+            }
+            if (this.#profiles.admin == null && adminName == profile.name) {
+                this.#profiles.admin = profile
+            }
+            if (profile.name.startsWith(learnerPrefix)) {
+                this.#profiles.learners.set(profile._id, profile)
+                this.#profiles.learnerIds.push(profile._id)
+            }
+        }
+        assert(this.#profiles.admin != null && this.#profiles.teacher != null && this.#profiles.learners.size !== 0,
+            `Unexpected empty data\n- admin[${this.#profiles?.admin?.name}] expected[${adminName}]\n- teacher[${this.#profiles?.teacher?.name}] expected[${teacherName}]\n- learnersSize[${this.#profiles?.learners.size}]`
+        )
+        this.log(prettyFormat({
+            admin: this.#profiles.admin,
+            teacher: this.#profiles.teacher,
+            learnersSize: this.#profiles.learners.size,
+            learners: Array.from(this.#profiles.learners.values()).slice(0, 1).concat('...')
+        }))
+        return this.#profiles
+    }
     async carrersPublished() {
         return await this.getServerCollection('/careers-publish')
     }
@@ -274,25 +265,9 @@ module.exports = class ApiCli extends BaseScript {
         }))
         return this.batchedCalls('deleteAllSession', calls)
     }
-    async deleteSession(sessionName) {
-        this.loghighlight(`\ndeleteSession [${sessionName}]`)
-        if (_.isEmpty(sessionName)) {
-            throw new Error('Empty session name')
-        }
-        const sessions = await this.sessions()
-        const session = sessions.result.find(x => x.title === sessionName)
-        if (session != null) {
-            const result = await this.delete('/server/api/careers-publish-sessions/', session._id)
-            this.log(`session [${sessionName}] deleted id[${session._id}]`)
-        } else {
-            this.log(`session [${sessionName}] not found`)
-        }
-    }
     async deleteSessionByName(sessionName) {
         this.loghighlight(`\deleteSessionByName [${sessionName}]`)
-        if (_.isEmpty(sessionName)) {
-            throw new Error('Empty session name')
-        }
+        assert(!_.isEmpty(sessionName), 'Empty session name')
         const sessions = await this.sessions()
         const session = sessions.result.find(x => x.title === sessionName)
         if (session != null) {
@@ -303,73 +278,49 @@ module.exports = class ApiCli extends BaseScript {
     }
     async deleteSessionById(id) {
         this.loghighlight(`\deleteSessionById [${id}]`)
-        if (_.isEmpty(id)) {
-            throw new Error('Empty session id')
-        }
-        const result = await this.delete('/server/api/careers-publish-sessions/', id)
+        assert(!_.isEmpty(id), 'Empty session id')
+        const result = await this.delete('/server/api/careers-publish-sessions/', id, 'true')
         this.log(`session id[${id}] deleted`)
     }
-    async createSession({ sessionName, publishedCareerName, sessionNbLearners, teacherName }) {
-        if (_.isEmpty(sessionName) || _.isEmpty(publishedCareerName) || _.isEmpty(teacherName) || !_.isInteger(sessionNbLearners)) {
-            throw new Error(`createSession - Empty sessionName[${sessionName}] or publishedCareerName[${publishedCareerName}] or teacherName[${teacherName}]or  bad sessionNbLearners[${sessionNbLearners}]`)
-        }
-        this.loghighlight(`\nCreate session[${sessionName}] publishedCareerName[${publishedCareerName}] sessionNbLearners[${sessionNbLearners}] teacherName[${teacherName}] `)
+    async createTestSession() {
+        const sessionName = this.scriptConfig.entities.session.mainName
+        assert(!_.isEmpty(sessionName), 'Empty session name [config.entities.session.mainName]')
+        const sessionNbLearners = this.scriptConfig.entities.session.mainNbLearners
+        assert(_.isInteger(sessionNbLearners) && sessionNbLearners > 0, `Unexpected number > 0  got[${sessionNbLearners}] [config.entities.session.mainNbLearners]`)
+        const publishedCareerName = this.scriptConfig.entities.career.mainName
+        assert(!_.isEmpty(sessionName), 'Empty career name [config.entities.career.mainName]')
+        const profiles = await this.splitProfiles()
+        assert(profiles.learners.size >= sessionNbLearners, `Not enougth leaner profiles Exected[${sessionNbLearners}] got[${profiles.learners.size}]`)
+        this.loghighlight(`\nCreate session[${sessionName}] publishedCareerName[${publishedCareerName}] sessionNbLearners[${sessionNbLearners}] teacherName[${profiles.teacher.name}] admin[${profiles.admin.name}]`)
         const sessions = await this.sessions()
         const session = sessions.result.find(x => x.title === sessionName)
         if (session != null) {
             await this.deleteSessionById(session._id)
         }
-        const profiles = await this.profiles()
-        const learnerIds = []
-        let teacherId = null
-        for (const profile of profiles.result) {
-            if (teacherId == null && teacherName == profile.name) {
-                teacherId = profile._id
-            }
-            if (learnerIds.length < sessionNbLearners && profile.name.includes('learner')) {
-                learnerIds.push(profile._id)
-            }
-        }
-        if (_.isEmpty(teacherId)) {
-            throw new Error(`Teacher name[${teacherId}] not found`)
-        }
-        if (learnerIds.length < sessionNbLearners) {
-            throw new Error(`Not enougth leaner profiles Exected[${sessionNbLearners}] got[${learnerIds.length}]`)
-        }
+        const learnerIds = profiles.learnerIds.slice(0, sessionNbLearners)
         const careers = await this.carrersPublished()
         const career = careers.find(x => x.title === publishedCareerName)
-        if (career == null) {
-            throw new Error(`Published career title[${publishedCareerName}] not found`)
-        }
+        assert(career != null, `Published career title[${publishedCareerName}] not found`)
         const createdSession = await this.put('/server/api/careers-publish-sessions', _getSessionData({
             sessionName: sessionName,
             /** ?? not _id  */
             careerId: career.id,
-            teacherId: teacherId,
-            learnerIds: null, //learnerIds,
-            groupIds: ["64c11f9e342e5ef526cbfe65"]
+            coaches: [
+                profiles.teacher._id,
+                profiles.admin._id
+            ],
+            individualUserIds: [profiles.teacher._id, admin._id, ...learnerIds],
+            groupIds: []
         }))
         this.log(`Session title[${sessionName}] created -  Career[${career.title}] learnerIds[${learnerIds.length}]`)
     }
     async login() {
         const loginPath = '/api/login'
         const loginData = {
-            login: process.env.SLDX_ADMIN_ID,
-            password: process.env.SLDX_ADMIN_PWD
+            login: this.scriptConfig.entities.admin.name,
+            password: this.scriptConfig.entities.admin.password
         }
-        if (this.dryrun) {
-            this.log(`${chalk.yellow('dryrun')}\nlogin[${this.baseUrlSso}${loginPath}]\n${JSON.stringify(loginData, null, 2)}`)
-            return {}
-        }
-        const httpSsoCli = axios.create({
-            baseURL: this.baseUrlSso
-        })
-        this.loghighlight(`\nlogin[${httpSsoCli.defaults.baseURL}${loginPath}`)
-        this.log(JSON.stringify(loginData, null, 2))
-        const { status, data } = await httpSsoCli.post(loginPath, loginData)
-        if (status != 200) {
-            throw new Error(`Login error path[${loginPath}]  status[${status}]`)
-        }
+        const data = await this.callSsoHttp('post', loginPath, loginData)
         this.createHttpCli(data.token)
     }
     async runBefore(method, ...args) {

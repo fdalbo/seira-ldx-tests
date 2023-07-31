@@ -35,9 +35,9 @@
   - exemple pour ``npm run artillery.script1 -- --sldxenv=toto``
   - ``sldx.toto.dotenv`` surcharge les valeurs par défaut
     ```
-        SLDX_PROXY_PROTOCOL: obligatoire
+        SLDX_PROTOCOL: obligatoire
         SLDX_PROXY_HOST: obligatoire
-        SLDX_ADMIN_ID: obligatoire
+        SLDX_ADMIN_NAME: obligatoire
         SLDX_ADMIN_PWD: obligatoire  
     ```
   - ``config.script1.toto.js`` surcharge la config de base (``config.script1.js``) si fichier présent
@@ -76,7 +76,7 @@
    - ``artillery report ./artillery-report/test-script1-debug-2023-07-21-5users.json``
 - **Playwright**
    - ``playwright/script1.spec.js``
-      - Lance le script avec un seul user dont le nom est donné par ``SLDX_PLAYWRIGHT_USER`` ou l'argument ``--sldxpwuser``
+      - Lance le script avec un seul user dont le nom est donné par ``SLDX_PLAYWRIGHT_LEARNER_NAME`` ou l'argument ``--sldxpwleaner``
       - ```npm run playwright.script1.debug -- --sldxpwuser=user4 ```
       - ```npm run playwright.script1 -- --sldxpwuser=user4 ```
       - ```npm run playwright.script1 -- --sldxpwuser=user1 --ui``` ppour le mode UI interractif

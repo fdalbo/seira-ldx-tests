@@ -11,9 +11,6 @@ const appRootDir = require('app-root-dir')
 const fs = require('fs-extra')
 const dateFormat = require('dateformat')
 const chalk = require('chalk')
-const assert = require('assert')
-const _ = require('lodash')
-
 /** absolute path to avoid .js extension*/
 const { appendToDefaultVars, ARGS_PREFIX } = require('#env/defaultEnvVars')
 
@@ -190,8 +187,7 @@ module.exports.initEnvVars = (additionalEnvVars, options) => {
      * 2/ ADDS PROCESS.ENV VARIABLES FROM environmentVariable
      */
     const removeLogDirFiles = environmentVariables.find(x => x.name == 'SLDX_LOG_DIR_REMOVE_FILES')?.value == 'true'
-    const urlPath = environmentVariables.find(x => x.name == 'SLDX_PROXY_HOST')?.value
-    assert(!_.isEmpty(urlPath), 'Empty SLDX_PROXY_HOST variable')
+    const urlPath = process.env.SLDX_PROXY_HOST.replace(/([^a-zA-Z0-9])/g, '-')
     const datePath = dateFormat(new Date(), 'yyyy-mm-dd-HH-MM-ss')
     const dayPath = dateFormat(new Date(), 'yyyy-mm-dd')
     let logDirPath = null
@@ -231,42 +227,27 @@ module.exports.initEnvVars = (additionalEnvVars, options) => {
             envVar.value = folderPath
         }
     }
-    /** sort for display */
-    environmentVariables.sort((a, b) => a.name.localeCompare(b.name))
-    /** Update  process.env */
-    for (const envVar of environmentVariables) {
-        /** UPDATE process.env */
-        process.env[envVar.name] = envVar.value ?? ''
-    }
+
     /** calculated variables */
-    const calculated =[]
-    
-    const proxyUrl = environmentVariables.find(x => x.name == 'SLDX_PROXY_URL')
-    proxyUrl.value = `${process.env.SLDX_PROTOCOL}://${process.env.SLDX_PROXY_HOST}${process.env.SLDX_PROXY_PORT ? `:${process.env.SLDX_PROXY_PORT}` : ''}`
-    calculated.push(proxyUrl)
-
-    const ssoUrl = environmentVariables.find(x => x.name == 'SLDX_SSO_URL')
-    ssoUrl.value = `${process.env.SLDX_PROTOCOL}://${process.env.SLDX_SSO_HOST}${process.env.SLDX_SSO_PORT ? `:${process.env.SLDX_SSO_PORT}` : ''}`
-    calculated.push(ssoUrl)
-   
-    const mongoUrl = environmentVariables.find(x => x.name == 'SLDX_MONGO_URL')
-    mongoUrl.value = `mongodb://${process.env.SLDX_MONGO_HOST}:${process.env.SLDX_MONGO_PORT}`
-    calculated.push(mongoUrl)
-
     const screenshotsPathVar = environmentVariables.find(x => x.name == 'SLDX_SCREENSHOTS_DIR_PATH')
     if (logDirPath && screenshotsPathVar) {
         screenshotsPathVar.value = path.resolve(logDirPath, 'screenshots')
-        fs.ensureDirSync(screenshotsPathVar.value) 
-        calculated.push(screenshotsPathVar)
+        fs.ensureDirSync(screenshotsPathVar.value)
     }
     const metricPathVar = environmentVariables.find(x => x.name == 'SLDX_METRICS_DIR_PATH')
     if (logDirPath && metricPathVar) {
         metricPathVar.value = path.resolve(logDirPath, 'metrics')
         fs.ensureDirSync(metricPathVar.value)
-        calculated.push(metricPathVar)
     }
     /** Update  process.env */
-    calculated.forEach(v => process.env[v.name] = v.value ?? '')
+    for (const envVar of environmentVariables) {
+        /** UPDATE process.env */
+        process.env[envVar.name] = envVar.value ?? ''
+    }
+
+    /** ADDS PROCESS.ENV VARIABLES FROM environmentVariables */
+
+    environmentVariables.sort((a, b) => a.name.localeCompare(b.name))
 
     if (options.traceVariables === true) {
         module.exports.traceVariables(environmentVariables)

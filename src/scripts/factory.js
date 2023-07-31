@@ -1,4 +1,6 @@
 
+'use strict';
+
 const myConsole = require('#commons/myConsole')
 const path = require('path')
 const _ = require('lodash')

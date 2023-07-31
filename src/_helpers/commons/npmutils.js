@@ -7,24 +7,14 @@ const path = require('path')
 const appRootDir = require('app-root-dir')
 const escapeStringRegexp = require('escape-string-regexp')
 
+const _chalk = (cmd)=>{
+    if(cmd.toLowerCase().includes('artillery')) return chalk.magenta(cmd)
+    if(cmd.toLowerCase().includes('playwright')) return chalk.cyan(cmd)
+    if(cmd.toLowerCase().includes('tools')) return chalk.green(cmd)
+    return chalk.grey(cmd)
 
-/**
- * See package.json.scripts
-* 'jestitems' launches the npm command in silent mode (command-items-jest.js) contrary to 'items' (command-items.js)
- * @param {*} workspace 
- * @param {*} npmCommand 
- * @returns 
- */
-const _itemsCmd = (workspace, npmCommand) => {
-    if (workspace === 'apps/qsfab-tests') {
-        /** This is jest script launched by jest-cli/bin/jest */
-        const isJestTest = npmCommand.match(/npx\s+jest/) || npmCommand.match(/\stest\..*\.js/)
-        if (isJestTest != null && isJestTest.length === 1) {
-            return 'jestitems'
-        }
-    }
-    return 'items'
 }
+
 /**
  * Scans the workspaces and the attached package.json
  * @returns {array} 
@@ -64,20 +54,13 @@ const _commandsList = async (textSearched) => {
                                 if (displayedScriptName === scriptName) {
                                     continue
                                 }
-                                /*
-                                if (scriptName.toLowerCase().includes(textSearched)) {
-                                    displayedScriptName = scriptName.replace(new RegExp(`${textSearched}`, 'gi'), chalk.whiteBright(textSearched))
-                                } else {
-                                    continue
-                                }
-                                */
                             }
                             const itemIdx = `${workspaceIdx}.${i}`
                             const cmd = `npm run ${displayedScriptName} ${workspace ? `-w ${workspace}` : ''}`
                             res.scripts.push({
                                 idx: itemIdx,
                                 cmd: cmd,
-                                title: `${chalk.yellow(`npm run ${_itemsCmd(workspace, npmCommand)} ${itemIdx}`.padEnd(30, ' '))}${chalk.grey(cmd)}`
+                                title: _chalk(cmd)
                             })
                         }
                     }

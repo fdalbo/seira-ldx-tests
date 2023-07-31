@@ -4,6 +4,7 @@ const _ = require('lodash')
 const deepmerge = require('deepmerge')
 const appRootDir = require('app-root-dir')
 const { format: prettyFormat } = require('pretty-format')
+const assert = require('assert')
 const myConsole = require('#commons/myConsole')
 const { SLDX_ENV_VAR } = require('#env/defaultEnvVars')
 
@@ -17,12 +18,12 @@ exports.TEMPO_TEXT_INPUT = 'textInput'
 exports.TEMPO_MODAL = 'modal'
 
 
-const _getArtilleryUser = () => {
+const _getArtilleryUserName = () => {
     const workerIdx = parseInt(process.env.LOCAL_WORKER_ID ?? '')
     if (isNaN(workerIdx)) {
         throw new Error(`Running artillery - Unexpected empty 'LOCAL_WORKER_ID' env variable`)
     }
-    const userPrefix = process.env.SLDX_LEARNER_PREFIX ?? 'user'
+    const userPrefix = process.env.SLDX_LEARNER_PREFIX
     if (userPrefix.length == 0) {
         throw new Error(`Running artillery - Unexpected empty 'SLDX_LEARNER_PREFIX' env variable`)
     }
@@ -35,12 +36,12 @@ const _getArtilleryUser = () => {
     }
     return `${userPrefix}${userFirstIdx}`
 }
-const _getPlaywrightUser = () => {
-    const user = process.env.SLDX_PLAYWRIGHT_USER ?? ''
-    if (user.length == 0) {
-        throw new Error(`Running playwright - Unexpected empty 'SLDX_PLAYWRIGHT_USER' env variable`)
+const _getPlaywrightUserName = () => {
+    const name = process.env.SLDX_PLAYWRIGHT_LEARNER_NAME
+    if (name.length == 0) {
+        throw new Error(`Running playwright - Unexpected empty 'SLDX_PLAYWRIGHT_LEARNER_NAME' env variable`)
     }
-    return user
+    return name
 }
 
 let _config = null
@@ -48,27 +49,45 @@ const _baseConfig = {
     /** artillery / playwright */
     exec: process.env.SLDX_RUNNER_EXEC,
     proxyUrl: process.env.SLDX_PROXY_URL,
-    users: {
+    ssoUrl: process.env.SLDX_SSO_URL,
+    entities: {
         admin: {
-            user: process.env.SSLDX_ADMIN_USER,
-            name: process.env.SSLDX_ADMIN_PASSWORD,
+            name: process.env.SLDX_ADMIN_NAME,
+            password: process.env.SLDX_ADMIN_PWD,
             role: exports.ROLE_ADMIN
         },
         learner: {
             /** many learners testperfs.learner.1, .2 ... */
-            id: null,
+            id: null, 
+            prefix: process.env.SLDX_LEARNER_PREFIX,
             password: process.env.SLDX_LEARNER_PWD,
+            encryptedPwd: process.env.SLDX_LEARNER_ENCRYPTED_PWD,
             role: exports.ROLE_LEARNER
         },
         teacher: {
-            id: process.env.SLDX_TEACHER_ID,
+            name: process.env.SLDX_TEACHER_NAME,
             password: process.env.SLDX_TEACHER_PWD,
             role: exports.ROLE_TEACHER
+        },
+        group: {
+            prefix: process.env.SLDX_GROUP_PREFIX
+        },
+        session: {
+            prefix: process.env.SLDX_SESSION_PREFIX,
+            mainName: `${process.env.SLDX_SESSION_PREFIX}main`,
+            mainNbLearners: 100
+        },
+        career: {
+            mainName:  `${process.env.SLDX_CAREER_PREFIX}main`,
         }
+    },
+    apiCli:{
+        timeout: 1000
     },
     mongo: {
         host: process.env.SLDX_MONGO_HOST,
         port: process.env.SLDX_MONGO_PORT,
+        url:  process.env.SLDX_MONGO_URL
     },
     tempo: {
         default: 2000,
@@ -81,36 +100,36 @@ const _baseConfig = {
     timeouts: {
         defaultNavigationTimeout: 30 * 1000,
         defaultTimeout: 30 * 1000
-
     },
     artillery: {
-        user: {
-            id: _getArtilleryUser,
+        learner: {
+            name: _getArtilleryUserName,
             password: process.env.SLDX_LEARNER_PWD ?? ''
         },
     },
     playwright: {
-        user: {
-            id: _getPlaywrightUser,
+        learner: {
+            name: _getPlaywrightUserName,
             password: process.env.SLDX_LEARNER_PWD ?? ''
         },
     },
     scenario: null,
     getUserId: (...args) => {
-        let learnerId = _config[process.env.SLDX_RUNNER_EXEC]?.users?.learner.id ?? ''
-        if (typeof learnerId == 'function') learnerId = learnerId.apply(this, args)
-        learnerId = learnerId.toString().trim()
-        if (typeof learnerId.length == 0) {
-            throw new Error(`Unexptected empty learner.id`)
+        let learnerName = _config[process.env.SLDX_RUNNER_EXEC]?.learner.name ?? ''
+        if (typeof learnerName == 'function') learnerName = learnerName.apply(this, args)
+        learnerName = learnerName.toString().trim()
+        if (learnerName.length == 0) {
+            throw new Error(`Unexpected empty learner.name`)
         }
-        return learnerId
+        return learnerName
     },
     getUserPwd: () => {
-        return _config[process.env.SLDX_RUNNER_EXEC]?.users?.learner?.password ?? ''
+        return _config[process.env.SLDX_RUNNER_EXEC]?.learner?.password ?? ''
     }
 }
 const _initConfig = (scriptId) => {
-    if (!['artillery', 'playwright', 'node' ].includes(process.env.SLDX_RUNNER_EXEC)) {
+    assert(!_.isNil(scriptId), 'Unexpected empty scriptId. Can\'t read config file')
+    if (!['artillery', 'playwright', 'node'].includes(process.env.SLDX_RUNNER_EXEC)) {
         throw new Error(`Unknown value for SLDX_RUNNER_EXEC [${process.env.SLDX_RUNNER_EXEC}]`)
     }
     const testEnv = process.env[SLDX_ENV_VAR] ?? ''
@@ -135,14 +154,14 @@ const _initConfig = (scriptId) => {
         throw new Error(`Script [${scriptId}] - Config file not found\n- [${configPath}]`)
     }
     _config = deepmerge(_baseConfig, require(configPath))
-    _config.scriptId =scriptId
-    _config.configPath =configPath
+    _config.scriptId = scriptId
+    _config.configPath = configPath
     myConsole.highlight(`Config Path: [${configPath}]`)
     myConsole.lowlight(`Config:\n${prettyFormat(_config)}\n©`)
     return _config
 }
 
 
-module.exports.getArtilleryUser = _getArtilleryUser
-module.exports.getPlaywrightUser = _getPlaywrightUser
+module.exports.getArtilleryUserName = _getArtilleryUserName
+module.exports.getPlaywrightUserName = _getPlaywrightUserName
 module.exports.initConfig = _initConfig

@@ -1,3 +1,6 @@
+'use strict';
+
+const ScriptRunner = require('./ScriptRunner')
 module.exports = class Script1 extends ScriptRunner {
   async afterLogin() {
     await super.afterLogin()

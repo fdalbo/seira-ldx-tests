@@ -1,3 +1,5 @@
+'use strict';
+
 const myConsole = require('#commons/myConsole')
 const prompts = require('prompts')
 const _ = require('lodash')
@@ -16,8 +18,8 @@ module.exports = class BaseScript {
             dryrun: true,
             scriptId: null
         }, opts ?? {})
-        this.loghighlight(`New [${this.className}] dryrun[${this.dryrun}]`)
-        this.#scriptConfig = _.isEmpty(opts.scriptId) ? null : initConfig(opts.scriptId)
+        this.loghighlight(`New [${this.className}] dryrun[${this.dryrun}] scriptId[${this.opts.scriptId}]`)
+        this.#scriptConfig = initConfig(this.opts.scriptId)
         this.log()
     }
     get className() {
@@ -68,8 +70,8 @@ module.exports = class BaseScript {
     }
     /**
      * [{ 
-     *      title: 'Udapdate passwords', 
-     *      description: `For all user.alias.match('/${_LEARNERS.PREFIX}*[0-9]+/') replaces the password by '${_LEARNERS.PASSWORD}'`,
+     *      title: 'Update passwords', 
+     *      description: `...`,
      *      value: 'updatePwd' 
      *  }, ...]
      */

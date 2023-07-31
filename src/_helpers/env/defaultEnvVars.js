@@ -50,7 +50,7 @@ const DEFAULT_VARS = [
         value: '2000'
     }, {
         name: 'SLDX_LOG_LEVEL',
-        value: 'info',
+        value: 'debug',
         // See https://www.npmjs.com/package/winston#logging
         values: ['none', 'error', 'warn', 'info', 'verbose', 'debug']
     }, {
@@ -78,7 +78,7 @@ const DEFAULT_VARS = [
         highlight: true,
         arg: `${_ARGS_PREFIX}LogDir`,
         /** /$host -> we create a SLDX_PROXY_HOST's hostname under /SLDX_LOG_DIR_PATH */
-        value: `./_logs/$host`
+        value: `./_logs/$host/$day`
     }, {
         /** calculated  SLDX_LOG_DIR_PATH/screenshots */
         name: 'SLDX_SCREENSHOTS_DIR_PATH',
@@ -96,7 +96,7 @@ const DEFAULT_VARS = [
         dirPath: true,
         arg: `${_ARGS_PREFIX}WorkDir`,
         /** /$host -> we create a SLDX_PROXY_HOST's hostname under /SLDX_WORK_DIR_PATH */
-        value: './_workdir/$host'
+        value: './_workdir/$host/$day'
     }, {
         name: 'SLDX_MONGO_HOST',
         value: '127.0.0.1'
@@ -104,17 +104,23 @@ const DEFAULT_VARS = [
         name: 'SLDX_MONGO_PORT',
         value: '27017'
     }, {
-        name: 'SLDX_PROXY_PROTOCOL',
-        arg: `${_ARGS_PREFIX}ProxyProtocol`,
+        /** calculated  */
+        name: 'SLDX_MONGO_URL',
+        allowEmpty: true,
+        highlight: true,
         value: ''
+    }, {
+        name: 'SLDX_PROTOCOL',
+        arg: `${_ARGS_PREFIX}ProxyProtocol`,
+        value: 'http'
     }, {
         name: 'SLDX_PROXY_HOST',
         arg: `${_ARGS_PREFIX}ProxyHost`,
-        value: ''
+        value: 'seira-ldx.seiralocaltest'
     }, {
         name: 'SLDX_PROXY_PORT',
         arg: `${_ARGS_PREFIX}ProxyPort`,
-        value: '',
+        value: '80',
         allowEmpty: true,
         type: 'numeric'
     }, {
@@ -125,7 +131,24 @@ const DEFAULT_VARS = [
         value: '',
         highlight: true
     }, {
-        name: 'SLDX_ADMIN_ID',
+        name: 'SLDX_SSO_HOST',
+        arg: `${_ARGS_PREFIX}SsoHost`,
+        value: 'localhost'
+    }, {
+        name: 'SLDX_SSO_PORT',
+        arg: `${_ARGS_PREFIX}SsoHost`,
+        value: '3010',
+        allowEmpty: true,
+        type: 'numeric'
+    }, {
+        name: 'SLDX_SSO_URL',
+        allowEmpty: true,
+        source: 'calculated',
+        /* calculated */
+        value: '',
+        highlight: true
+    }, {
+        name: 'SLDX_ADMIN_NAME',
         value: 'testperfs.admin',
         arg: `${_ARGS_PREFIX}AdminId`,
         highlight: true
@@ -135,8 +158,8 @@ const DEFAULT_VARS = [
         arg: `${_ARGS_PREFIX}AdminPwd`,
         highlight: true
     }, {
-        name: 'SLDX_TEACHER_ID',
-        value: 'tesperfs.teacher',
+        name: 'SLDX_TEACHER_NAME',
+        value: 'testperfs.teacher',
         arg: `${_ARGS_PREFIX}TeacherId`,
         highlight: true
     }, {
@@ -148,13 +171,25 @@ const DEFAULT_VARS = [
         name: 'SLDX_LEARNER_PWD',
         value: 'seira'
     }, {
+        name: 'SLDX_LEARNER_ENCRYPTED_PWD',
+        value: '$2a$10$egusEbUGmahKRCwcLgks1el2DyNJadEbNM57BnouqynHkn5VxZjj.'
+    }, {
         name: 'SLDX_LEARNER_FIRST_IDX',
         arg: `${_ARGS_PREFIX}FirstIdx`,
         type: 'numeric',
         value: '0'
     }, {
         name: 'SLDX_LEARNER_PREFIX',
-        value: 'tesperfs.learner'
+        value: 'testperfs.learner.'
+    }, {
+        name: 'SLDX_SESSION_PREFIX',
+        value: 'testperfs.session.'
+    }, {
+        name: 'SLDX_CAREER_PREFIX',
+        value: 'testperfs.career.'
+    }, {
+        name: 'SLDX_GROUP_PREFIX',
+        value: 'testperfs.group.'
     }, {
         name: 'SLDX_METRICS_ENABLED',
         value: 'true'
@@ -177,6 +212,11 @@ const DEFAULT_VARS = [
         dirPath: true,
         highlight: true,
         value: './playwright',
+    },{
+        name: 'SLDX_PLAYWRIGHT_LEARNER_NAME',
+        arg: `${_ARGS_PREFIX}pwleaner`,
+        /**  SLDX_LEARNER_PREFIX + 1 - only on learner in playwright mode */
+        value: 'testperfs.learner.1'
     },
     /* calculated by runner node, playwright, artillery*/
     {
@@ -188,12 +228,6 @@ const DEFAULT_VARS = [
         name: 'SLDX_RUNNER_SCRIPT_NAME',
         source: 'calculated',
         allowEmpty: true,
-        value: ''
-    }, {
-        name: 'SLDX_PLAYWRIGHT_USER',
-        source: 'calculated',
-        allowEmpty: true,
-        arg: `${_ARGS_PREFIX}pwuser`,
         value: ''
     }, {
         name: 'SLDX_PLAYWRIGTH_UI',
