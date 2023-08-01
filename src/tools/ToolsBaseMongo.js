@@ -1,10 +1,10 @@
 'use strict';
 
 const { MongoClient } = require('mongodb')
-const BaseScript = require('./BaseScript')
 const _ = require('lodash')
 const assert = require('assert')
 const escapeRegExp = require('escape-string-regexp')
+const ToolsBase = require('./ToolsBase')
 
 
 const _DBNAMES = {
@@ -53,7 +53,7 @@ const _SEIRASSO_COLLECTIONS = {
 module.exports.SEIRASSO_COLLECTIONS = _SEIRASSO_COLLECTIONS
 
 
-module.exports.SeiraMongoClient = class SeiraMongoClient extends BaseScript {
+module.exports.ToolsBaseMongo = class ToolsBaseMongo extends ToolsBase {
     #url = null
     #mongoClient = null
     constructor(opts) {

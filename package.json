@@ -9,16 +9,15 @@
   "author": "",
   "license": "ISC",
   "scripts": {
-    "list": "node ./src/scripts/command-list.js",
-    "items": "node ./src/scripts/command-items.js",
-    "displayEnVariables": "node runner.artillery.js",
+    "list": "node ./scripts/commands.list",
+    "display.vars.debug": "node runner.node.js displayvars.js --sldxenv=debug",
     "artillery.test.vusers": "node runner.artillery.js test-vusers.yml",
     "artillery.script1": "node runner.artillery.js test-script1.yml",
     "artillery.script1.debug": "node runner.artillery.js test-script1-debug.yml --sldxenv=debug",
     "playwright.script1": "node runner.playwright.js script1.spec.js",
     "playwright.script1.debug": "node runner.playwright.js script1.spec.js --sldxenv=debug --debug",
-    "tools.mongo.debug": "node runner.node.js  ./src/scripts/ScriptMongo.js --sldxenv=debug --debug",
-    "tools.initTests.debug": "node runner.node.js ./src/scripts/ScriptTestsInit.js --sldxenv=debug --debug"
+    "tools.mongo.script1.debug": "node runner.node.js  ./scripts/tools.mongo.script1.js --sldxenv=debug --debug",
+    "tools.api.script1.debug": "node runner.node.js ./scripts/tools.api.script1.js --sldxenv=debug --debug"
   },
   "imports": {
     "#src/*": "./src/*.js",
@@ -27,7 +26,8 @@
     "#env/*": "./src/_helpers/env/*.js",
     "#imports/*": "./src/_helpers/imports/*.js",
     "#dbs/*": "./src/_helpers/dbs/*.js",
-    "#scripts/*": "./src/scripts/*.js"
+    "#scripts/*": "./src/scripts/*.js",
+    "#tools/*": "./src/tools/*.js"
   },
   "dependencies": {
     "app-root-dir": "~1.0.2",

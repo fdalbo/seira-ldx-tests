@@ -1,16 +1,16 @@
 'use strict';
 
-const myConsole = require('#commons/myConsole')
 const prompts = require('prompts')
 const _ = require('lodash')
 const parseArguments = require('minimist')
 const appRootDir = require('app-root-dir')
+const myConsole = require('#commons/myConsole')
 const {
     initConfig
 } = require(`${appRootDir.get()}/config.base`)
 
 
-module.exports = class BaseScript {
+module.exports = class ToolsBase {
     #scriptConfig = null
     #opts = null
     constructor(opts) {

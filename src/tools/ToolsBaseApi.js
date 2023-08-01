@@ -2,10 +2,10 @@
 
 const axios = require('axios')
 const _ = require('lodash')
-const BaseScript = require('./BaseScript')
 const { format: prettyFormat } = require('pretty-format')
 const chalk = require('chalk')
 const assert = require('assert')
+const ToolsBase = require('./ToolsBase')
 
 // http://seira-ldx.seiralocaltest/alerting/api/system/session-head-teacher-added
 const _getSessionData = ({ sessionName, careerId, coaches, individualUserIds, groupIds }) => {
@@ -42,7 +42,7 @@ const _methodColor = {
 
 const _okHtpStatus = [200, 201]
 const _validHtpStatus = [404, ..._okHtpStatus]
-module.exports = class ApiCli extends BaseScript {
+module.exports = class ToolsBaseApi extends ToolsBase {
     #httpCli = null
     #httpCliSso = null
     #profiles = null
@@ -309,19 +309,25 @@ module.exports = class ApiCli extends BaseScript {
                 profiles.teacher._id,
                 profiles.admin._id
             ],
-            individualUserIds: [profiles.teacher._id, admin._id, ...learnerIds],
+            individualUserIds: [profiles.teacher._id, profiles.admin._id, ...learnerIds],
             groupIds: []
         }))
         this.log(`Session title[${sessionName}] created -  Career[${career.title}] learnerIds[${learnerIds.length}]`)
     }
     async login() {
-        const loginPath = '/api/login'
-        const loginData = {
-            login: this.scriptConfig.entities.admin.name,
-            password: this.scriptConfig.entities.admin.password
+        const saveDryrun = this.dryrun
+        try {
+            this.dryrun = false
+            const loginPath = '/api/login'
+            const loginData = {
+                login: this.scriptConfig.entities.admin.name,
+                password: this.scriptConfig.entities.admin.password
+            }
+            const data = await this.callSsoHttp('post', loginPath, loginData)
+            this.createHttpCli(data.token)
+        } finally {
+            this.dryrun = saveDryrun
         }
-        const data = await this.callSsoHttp('post', loginPath, loginData)
-        this.createHttpCli(data.token)
     }
     async runBefore(method, ...args) {
         if (method === this.login) {

@@ -56,7 +56,7 @@ const _init = (mainScriptPath, additionalEnvVars) => {
     const dotEnvFileName = `${ARGS_PREFIX}.${tests_env}.dotenv`
     let dotEnvFilePath = path.resolve(`./${dotEnvFileName}`)
     if (!fs.existsSync(dotEnvFilePath)) {
-        myConsole.warning(`Expected env file path [${dotEnvFilePath}] not found`)
+        myConsole.warning(`\n\nExpected dotenv file path [${dotEnvFilePath}] not found\nTakes /.env\n`)
         dotEnvFilePath = null
     } else {
         myConsole.highlight(`Init environment variables\ndotEnvFilePath [${dotEnvFilePath}]`)

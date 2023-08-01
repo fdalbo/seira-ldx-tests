@@ -5,17 +5,16 @@ const { format: prettyFormat } = require('pretty-format')
 const _ = require('lodash')
 const assert = require('assert')
 const escapeRegExp = require('escape-string-regexp')
-const myConsole = require('#commons/myConsole')
 const {
     SEIRASSO_COLLECTIONS,
-    SeiraMongoClient,
-} = require('./MongoClientSeira')
+    ToolsBaseMongo,
+} = require('./ToolsBaseMongo')
 
 
 /**
  * COMMAND: node ./_mongo/mongoClient.js --sldxenv script1
  */
-class MyClient extends SeiraMongoClient {
+module.exports = class ToolsScript1Mongo extends ToolsBaseMongo {
     #loginCollection = null
     #profilesCollection = null
     #groupsCollection = null
@@ -268,17 +267,4 @@ class MyClient extends SeiraMongoClient {
     }
 
 }
-
-(async () => {
-    try {
-        const cli = await MyClient.factory({
-            scriptId: 'script1'
-        })
-        await cli.askAndExecAction()
-    } catch (e) {
-        myConsole.error('Error running script', __filename, e);
-    } finally {
-        process.exit(0)
-    }
-})()
 
