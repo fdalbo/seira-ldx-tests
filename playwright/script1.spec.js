@@ -9,7 +9,7 @@ const Script1 = require('../src/scripts/Script1');
  * npm run playwright.script1 --  --sldxenv=fdalbo --sldxpwuser=user3 --ui
  */
 test('RUN SCRIPT1', async ({ page }) => {
-  /** https://playwr  ight.dev/docs/test-timeouts */
+  /** https://playwright.dev/docs/test-timeouts */
   test.setTimeout(Script1.scriptTimeout());
   await Script1.runScript(__filename, page)
 });

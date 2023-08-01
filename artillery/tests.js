@@ -1,5 +1,5 @@
 module.exports = { script1, testVUsers };
-const ScriptRunner = require('#scripts/ScriptRunner')
+const Script1 = require('#scripts/Script1')
 const myConsole = require('#commons/myConsole')
 
 const getcpt = (cpt) => {
@@ -21,14 +21,13 @@ async function script1(pwPage) {
     process.env.SLDX_CPT_RUN = '1'
   }
   myConsole.warning(`ARTILLERY RUN SCRIPT1 THREAD[${myConsole.threadId}] CPT[${getcpt('SLDX_CPT_RUN')}]`)
-  return
   if (process.env.SLDX_LOADED == 'true') {
     myConsole.highlight(`ARTILLERY RUN TEST.JS - ALREADY LOADED - SKIP`)
     return
   }
   process.env.SLDX_LOADED = 'true'
   myConsole.highlight(`ARTILLERY RUN TEST.JS`)
-  await ScriptRunner.runScript('Script1', __filename, pwPage)
+  await Script1.runScript(__filename, pwPage)
 }
 /**
  * TEST1
