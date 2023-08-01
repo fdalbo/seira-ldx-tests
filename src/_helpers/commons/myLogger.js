@@ -102,6 +102,6 @@ module.exports = function createLogger(logFilePath, myConsole, opts) {
     myLogger.info(`process.pid='${process.pid}' - process.ppid='${process.ppid}' - ${isMainThread ? 'main-thread' : `Worker-thread=${threadId}`}`)
     /** filter env variables for unit tests (env variables are not set) */
     myLogger.info(`Default env vars:\n${getEnvValues().filter(x => !_.isEmpty(x.value)).map(x => `- ${x.name}='${x.value}'`).join('\n')}`)
-    myConsole && myConsole.lowlight(`Creates myLogger '${myLogger.name}' - Level: '${myLogger.level}'\n- ${myLogger.filePath}\n`)
+    myConsole && myConsole.lowlight(`Creates myLogger '${myLogger.name}' - Level: '${myLogger.level}'\nFile[ ${myLogger.filePath}]`)
     return myLogger
 }

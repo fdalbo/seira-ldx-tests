@@ -3,9 +3,9 @@ config:
   target: http://localhost:2020/
   phases:
     - name: Warm up phase
-      duration: 1
-      maxVusers: 10
-      arrivalRate: 10
+      duration: 10
+      maxVusers: 15
+      arrivalRate: 15
 
 #--------------------------------------------------------------------------------
 # The following example creates 20 virtual users in 60 seconds (one virtual user approximately every 3 seconds):
@@ -28,7 +28,10 @@ config:
   engines:
     playwright: {}
   # Path to JavaScript file that defines Playwright test functions
-  processor: "./tests.js"
+  processor: ./tests-artillery.js
+before:
+  flow:
+     - function: initTest
 scenarios:
   - engine: playwright
-    testFunction: "testVUsers"
+    testFunction: script1

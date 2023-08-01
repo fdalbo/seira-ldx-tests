@@ -143,7 +143,7 @@ module.exports = class ScriptRunner {
     name = null
     pwPage = null
     config = null
-    learnerId = null
+    learnerName = null
     learnerRole = null
     scenario = null
     errorIdx = 0
@@ -155,7 +155,7 @@ module.exports = class ScriptRunner {
         this.pwPage = pwPage
         this.config = initConfig(this.className.toLowerCase())
         this.scenario = this.config.scenario ?? {}
-        this.learnerId = this.config.getUserId()
+        this.learnerName = this.config.getLearnerName()
         this.learnerRole = this.config?.entities?.learner?.role ?? 'empty'
         /** see https://playwright.dev/docs/api/class-page#page-set-default-navigation-timeout  */
         pwPage.setDefaultNavigationTimeout(this.config.timeouts.defaultNavigationTimeout ?? 1000)
@@ -224,8 +224,11 @@ module.exports = class ScriptRunner {
     }
     async throwError(message, throwError = true) {
         this.errorIdx++
+        await pause (1000)
         await this.saveScreenShot('body', `error_${this.errorIdx++}`)
+        message = `[${myConsole.threadId}] [${this.learnerName ?? 'no learner'}] ${message}`
         if (throwError == true) {
+            myConsole.error('A fatal error occured (see screenshot)', new Error(message))
             throw new Error(message)
         } else {
             myConsole.error('A non-fatal error occured', new Error(message))
@@ -336,7 +339,7 @@ module.exports = class ScriptRunner {
         await this.clickByRole(_CLICKABLE.LINKS.MYSESSIONS, tempo)
     }
     async clickSelectSessionApprenant(tempo) {
-        await this.clickList(this.scenario.sessionName, tempo)
+        await this.clickList(this.config.entities.session.mainName, tempo)
     }
     async clickNextCard(tempo) {
         await this.clickByRole(_CLICKABLE.BUTTONS.CARDNEXT, tempo)
@@ -361,7 +364,7 @@ module.exports = class ScriptRunner {
             this.log('Career starts from user session\'s page')
             text = await element.innerHTML()
         } else {
-            let element = await this.selector(selectorPageApprenant)
+            element = await this.selector(selectorPageApprenant)
             if (element != null) {
                 this.log('Career starts from learner\' homre welcome session')
                 text = await element.innerHTML()
@@ -369,8 +372,8 @@ module.exports = class ScriptRunner {
                 this.throwError(`Career starts from an unknownn page`)
             }
         }
-        if (text.toLowerCase() != 'démarrer') {
-            this.throwError(`User[${this.learnerId}] - Unexpected 'start career' button - Expected[démarrer] Got[${text}]`)
+        if (_.isEmpty(text) || text.toLowerCase() != 'démarrer') {
+            this.throwError(`User[${this.learnerName}] - Unexpected 'start career' button - Expected[démarrer] Got[${text}]`)
         }
         await this.clickByRole(_CLICKABLE.BUTTONS.DEMARRER, tempo)
     }
@@ -485,9 +488,9 @@ module.exports = class ScriptRunner {
         }
     }
     async login(tempo) {
-        this.logHighlight(`login ${this.learnerId}/${this.config.getUserPwd()} [${this.learnerRole}]`)
+        this.logHighlight(`login ${this.learnerName}/${this.config.getUserPwd()} [${this.learnerRole}]`)
         await this.gotoPage(_CLICKABLE.PAGES.CLIENT)
-        await this.fillLabel('Veuillez entrer votre identifiant ou e-mail *', this.learnerId)
+        await this.fillLabel('Veuillez entrer votre identifiant ou e-mail *', this.learnerName)
         await this.fillLabel('Mot de passe : *', this.config.getUserPwd())
         await this.clickConnect()
         await pause(1000)
@@ -500,7 +503,7 @@ module.exports = class ScriptRunner {
          * Eg: npm run playwright.script1 --  --sldxenv=fdalbo --sldxpwuser=user3 --ui
          */
         if ((this.isArtillery() || !this.isPlayWrightUi()) && expectedPogress != sessionProgress) {
-            this.throwError(`unexpected session progression for user[${this.learnerId}] - Expected[${expectedPogress}] - Got[${sessionProgress}]`)
+            this.throwError(`unexpected session progression for user[${this.learnerName}] - Expected[${expectedPogress}] - Got[${sessionProgress}]`)
         }
     }
     async getSessionProgression() {
@@ -519,7 +522,7 @@ module.exports = class ScriptRunner {
             await this.learnerCheckSatus()
         } else {
             /** In case we want to develop scenarri for other  user roles */
-            this.throwError(`Unexpected user role[${this.learnerId}.${this.learnerRole}] - Expected[${ROLE_LEARNER}]`)
+            this.throwError(`Unexpected user role[${this.learnerName}.${this.learnerRole}] - Expected[${ROLE_LEARNER}]`)
         }
     }
     async learnerCheckSatus() {
@@ -542,8 +545,7 @@ module.exports = class ScriptRunner {
     static async runScript(scriptFilePath, pwPage) {
         let runError = null
         try {
-            const scriptName = path.basename(scriptFilePath)
-            myConsole.initLoggerFromModule(scriptName)
+            myConsole.initLoggerFromModule(this.name.toLowerCase())
             myConsole.superhighlight(`BEGIN RUN ${this.name}`)
             myConsole.lowlight(`From [${scriptFilePath}]`)
             if (_.isEmpty(process.env.SLDX_RUNNER_EXEC)) {

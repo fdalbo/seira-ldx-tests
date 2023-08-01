@@ -18,7 +18,7 @@ exports.TEMPO_TEXT_INPUT = 'textInput'
 exports.TEMPO_MODAL = 'modal'
 
 
-const _getArtilleryUserName = () => {
+const _getArtilleryLearnerName = () => {
     const workerIdx = parseInt(process.env.LOCAL_WORKER_ID ?? '')
     if (isNaN(workerIdx)) {
         throw new Error(`Running artillery - Unexpected empty 'LOCAL_WORKER_ID' env variable`)
@@ -36,7 +36,7 @@ const _getArtilleryUserName = () => {
     }
     return `${userPrefix}${userFirstIdx}`
 }
-const _getPlaywrightUserName = () => {
+const _getPlaywrightLearnerName = () => {
     const name = process.env.SLDX_PLAYWRIGHT_LEARNER_NAME
     if (name.length == 0) {
         throw new Error(`Running playwright - Unexpected empty 'SLDX_PLAYWRIGHT_LEARNER_NAME' env variable`)
@@ -103,24 +103,25 @@ const _baseConfig = {
     },
     artillery: {
         learner: {
-            name: _getArtilleryUserName,
+            name: _getArtilleryLearnerName,
             password: process.env.SLDX_LEARNER_PWD ?? ''
         },
     },
     playwright: {
         learner: {
-            name: _getPlaywrightUserName,
+            name: _getPlaywrightLearnerName,
             password: process.env.SLDX_LEARNER_PWD ?? ''
         },
     },
     scenario: null,
-    getUserId: (...args) => {
+    getLearnerName: (...args) => {
         let learnerName = _config[process.env.SLDX_RUNNER_EXEC]?.learner.name ?? ''
         if (typeof learnerName == 'function') learnerName = learnerName.apply(this, args)
         learnerName = learnerName.toString().trim()
         if (learnerName.length == 0) {
             throw new Error(`Unexpected empty learner.name`)
         }
+        myConsole.highlight(`learner[${learnerName}]`)
         return learnerName
     },
     getUserPwd: () => {
@@ -162,6 +163,6 @@ const _initConfig = (scriptId) => {
 }
 
 
-module.exports.getArtilleryUserName = _getArtilleryUserName
-module.exports.getPlaywrightUserName = _getPlaywrightUserName
+module.exports.getArtilleryUserName = _getArtilleryLearnerName
+module.exports.getPlaywrightUserName = _getPlaywrightLearnerName
 module.exports.initConfig = _initConfig

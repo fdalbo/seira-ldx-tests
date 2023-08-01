@@ -5,6 +5,7 @@ const clone = require('clone')
 const _ = require('lodash')
 const fs = require('fs')
 const path = require('path')
+const { format: prettyFormat } = require('pretty-format')
 const createLogger = require('#commons/myLogger')
 const { isMainThread, threadId } = require('worker_threads')
 const stripAnsi = require('strip-ansi')
@@ -13,10 +14,9 @@ const chalk = require('chalk')
 
 const _Console = function () {
     let _traceConsole = null
-    let _traceRequests = null
-    let _traceResponses = null
-    let _traceResponseBody = null
-    let _traceResponseLength = null
+    let _traceHttpRequests = null
+    let _traceHttpResponses = null
+    let _traceHttpLength = null
     let loggerStack = []
     let _currentLogger = null
     const _t0 = (() => {
@@ -109,14 +109,13 @@ const _Console = function () {
             return process.env[varname] === 'true' || process.env[varname] === true
         }
         this.enableConsole(_isTrue('SLDX_CONSOLE_TRACE'))
-        _traceRequests = _isTrue('SLDX_TRACE_HTTP_REQUESTS')
-        _traceResponses = _isTrue('SLDX_TRACE_HTTP_RESPONSES')
-        _traceResponseBody = _isTrue('SLDX_TRACE_HTTP_RESPONSE_BODY')
-        _traceResponseLength = _isTrue('SLDX_TRACE_HTTP_RESPONSE_LENGTH')
-        if (isNumber(_traceResponseLength)) {
-            _traceResponseLength = parseInt(_traceResponseLength)
+        _traceHttpRequests = _isTrue('SLDX_TRACE_HTTP_REQUESTS')
+        _traceHttpResponses = _isTrue('SLDX_TRACE_HTTP_RESPONSES')
+        _traceHttpLength = _isTrue('SLDX_TRACE_HTTP_LENGTH')
+        if (isNumber(_traceHttpLength)) {
+            _traceHttpLength = parseInt(_traceHttpLength)
         } else {
-            _traceResponseLength = 2000
+            _traceHttpLength = 2000
         }
     }
 
@@ -133,7 +132,13 @@ const _Console = function () {
          * with commonjs  initLoggerFromModule(__filename)
          *       this.initLogger(path.basename(import_meta, '.js'))
          */
-        this.initLogger(path.basename(import_meta, '.js'), opts)
+        let name
+        if (import_meta.endsWith('.js')) {
+            name = path.basename(import_meta, '.js')
+        } else {
+            name = import_meta
+        }
+        this.initLogger(name, opts)
     }
 
     /** opts: {
@@ -150,11 +155,11 @@ const _Console = function () {
             threadPrefix: this.threadId
         }, opts ?? {})
         if (_.isEmpty(opts.logDirPath)) {
-            this.warning(`Can't create qsConsolelogger [${logFileName}] - Process.env.SLDX_LOG_DIR_PATH is empty`)
+            this.warning(`Can't create logger [${logFileName}] - Process.env.SLDX_LOG_DIR_PATH is empty`)
             return
         }
         if (!fs.existsSync(opts.logDirPath)) {
-            this.warning(`Can't create qsConsolelogger  [${logFileName}] - Folder '${opts.logDirPath}' not found`)
+            this.warning(`Can't create logger  [${logFileName}] - Folder '${opts.logDirPath}' not found`)
             return
         }
         logFileName ??= `myConsole.${process.id}`
@@ -249,20 +254,10 @@ const _Console = function () {
         this.loggerAll.apply(this, args)
         _traceConsole && _consoleLog(chalk.gray.apply(chalk, args))
     }
-    this.mediumlight = (...args) => {
-        /** !! Console & logging Always available */
-        this.loggerAll.apply(this, args)
-        _traceConsole && _consoleLog(chalk.yellow.apply(chalk, args))
-    }
     this.superhighlight = (...args) => {
         /** !! Console & logging Always available */
         this.loggerAll.apply(this, args)
         _traceConsole && _consoleLog(chalk.yellowBright.apply(chalk, args))
-    }
-    this.describeBlock = (...args) => {
-        /** !! Console Always available */
-        this.loggerAll.apply(this, args)
-        _traceConsole && _consoleLog(chalk.bold.apply(chalk, args))
     }
     this.red = (...args) => {
         /** !! Console & logging Always available */
@@ -327,111 +322,29 @@ const _Console = function () {
         _traceConsole && _consoleLog(chalk.italic(chalk.cyanBright.apply(chalk, args)))
     }
 
-    this.traceResponse = (messageOrResponse, response) => {
-        try {
-            if (_traceResponses !== true) {
-                return
-            }
-            // To not modify the original
-            const responseBody = clone(response?.body ?? {})
-            const message = []
-            if (typeof messageOrResponse === 'string') {
-                message.push(messageOrResponse)
-            } else {
-                response = messageOrResponse
-            }
-            let isJson = false
-            if (response && response.status && responseBody) {
-                if (response.request) {
-                    message.push(`${response.request.method} - ${response.request.url}`)
-                }
-                message.push(`Status: ${response.status} - Headers: ${JSON.stringify(response.header, null, 2)}`)
-                const ct = response.header['Content-Type'] ?? response.header['content-type'] ?? ''
-                isJson = ct.indexOf('application/json') >= 0
-                if (isJson && responseBody.error) {
-                    if (responseBody.error.message) {
-                        // 500 errors ?? .error
-                        message.push(`Error Message:\n${responseBody.error.message}`)
-                    }
-                    if (responseBody.error.details && responseBody.error.details.length > 1) {
-                        // first detail is the error message
-                        message.push(`Error Details:\n${responseBody.error.details.slice(1).join('\n')}`)
-                    }
-                }
-            }
-            _traceConsole && _consoleLog(chalk.italic(chalk[response.status >= 400 ? 'red' : 'green'].apply(chalk, [message.join('\n')])))
-            if (_traceResponseBody !== true) {
-                this.loggerDebug(message.join('\n'))
-                return
-            }
-            if (isJson) {
-                message.push('Data:')
-                if (responseBody.error) {
-                    /** Cleanup huge java stack :-( */
-                    responseBody.error = _cleanupHttpError(responseBody.error)
-                }
-                message.push(JSON.stringify(responseBody, null, 2).slice(0, _traceResponseLength))
-            } else if (response?.text) {
-                //this.loggerDebug('This is not a JSON payload - Print TEXT')
-                message.push('This is not a JSON payload - Print TEXT')
-                /** This is not the JSON - Print TEXT */
-                //this.loggerDebug(response.text.slice(0, _traceResponseLength))
-                message.push(response.text.slice(0, _traceResponseLength))
-            } else {
-                //this.loggerDebug('This is not a JSON payload - response.text is null')
-                message.push('This is not a JSON payload - response.text is null')
-            }
-            this.loggerDebug(message.join('\n'))
-        } catch (e) { this.error(e) }
+    this.logHttpResponseBody = (headers, data) => {
+        if (_traceHttpResponses !== true) {
+            return
+        }
+        this.loggerDebug('Response Headers')
+        this.loggerDebug(prettyFormat(headers))
+        if (_.isEmpty(data)) {
+            this.loggerDebug('Response Body[no data]')
+            return
+        }
+        this.loggerDebug('Response Body')
+        this.loggerDebug(prettyFormat(data).substring(0, _traceHttpLength))
     }
 
-    /**
-     * 
-     * @param { string or superTestRequest} messageOrRequest 
-     * @param {superTestRequest} request 
-     * @param {obj} params 
-     * @returns 
-     */
-    this.traceRequest = (messageOrRequest, request, params) => {
-        if (_traceRequests !== true) {
+    this.logHttpRequestBody = (...args) => {
+        if (_traceHttpRequests !== true) {
             return
         }
-        const message = []
-        if (typeof messageOrRequest === 'string') {
-            message.push(messageOrRequest)
-        } else {
-            request = messageOrRequest
-        }
-        if (!request) {
-            message.push('no request to trace')
-            this.loggerDebug(message.join('\n'))
+        if (_.isEmpty(args)) {
             return
         }
-        let url
-        if (!_.isEmpty(params)) {
-            /**
-             * the params are serialized by .query(p) method and are not available in superTestRequest.url at this stage
-             * we serialize the params by our own
-             */
-            const qs = new URLSearchParams(params)
-            url = `${request.url}?${qs.toString()}`
-        } else {
-            url = request.url
-        }
-        message.push(`${request.method} - ${url}`)
-        if (request.header) {
-            const h = Object.assign({}, request.header)
-            if (false && h.Authorization) {
-                h.Authorization = h.Authorization.slice(-40)
-            }
-            message.push(`Headers: ${JSON.stringify(h, null, 2)}`)
-        }
-        _traceConsole && _consoleLog(chalk.italic(chalk.blue.apply(chalk, [message.join('\n')])))
-        if (request._data) {
-            message.push('data')
-            message.push(JSON.stringify(request._data || {}, null, 2))
-        }
-        this.loggerDebug(message.join('\n'))
+        /** file logger only  */
+        this.loggerDebug(prettyFormat(args).substring(0, _traceHttpLength))
     }
 
     /** Log in loger file (no console) */

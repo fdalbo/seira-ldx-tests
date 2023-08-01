@@ -38,13 +38,8 @@ const DEFAULT_VARS = [
         allowEmpty: true,
         value: 'true',
         type: 'boolean'
-    }, {
-        name: 'SLDX_TRACE_HTTP_RESPONSE_BODY',
-        allowEmpty: true,
-        value: 'true',
-        type: 'boolean'
-    }, {
-        name: 'SLDX_TRACE_HTTP_RESPONSE_LENGTH',
+    },{
+        name: 'SLDX_TRACE_HTTP_LENGTH',
         allowEmpty: true,
         type: 'numeric',
         value: '2000'
@@ -174,7 +169,7 @@ const DEFAULT_VARS = [
         name: 'SLDX_LEARNER_ENCRYPTED_PWD',
         value: '$2a$10$egusEbUGmahKRCwcLgks1el2DyNJadEbNM57BnouqynHkn5VxZjj.'
     }, {
-        name: 'SLDX_LEARNER_FIRST_IDX',
+        name: 'SLDX_ARTILLERY_USER_FIRST_IDX',
         arg: `${_ARGS_PREFIX}FirstIdx`,
         type: 'numeric',
         value: '0'
@@ -194,12 +189,12 @@ const DEFAULT_VARS = [
         name: 'SLDX_METRICS_ENABLED',
         value: 'true'
     }, {
-        name: 'SLX_ARTILLERY_ROOT_DIR',
+        name: 'SLDX_ARTILLERY_ROOT_DIR',
         highlight: true,
         dirPath: true,
         value: './artillery',
     }, {
-        name: 'SLX_ARTILLERY_REPORT_SUFFIX',
+        name: 'SLDX_ARTILLERY_REPORT_SUFFIX',
         allowEmpty: true,
         /**
          * allow empty , string, $date, $day
@@ -208,7 +203,7 @@ const DEFAULT_VARS = [
          */
         value: '$day',
     }, {
-        name: 'SLX_PLAYWRIGHT_ROOT_DIR',
+        name: 'SLDX_PLAYWRIGHT_ROOT_DIR',
         dirPath: true,
         highlight: true,
         value: './playwright',
@@ -243,6 +238,9 @@ const DEFAULT_VARS = [
         name: 'SLDX_PLAYWRIGTH_SCRIPT_TIMEOUT',
         type: 'numeric',
         value: new Number(10 * 60 * 60 * 1000).toString()
+    }, {
+        name: 'SLDX_ARTILLERY_NB_VUSERS',
+        allowEmpty: true
     }
 ]
 

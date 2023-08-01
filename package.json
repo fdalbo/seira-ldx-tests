@@ -12,12 +12,12 @@
     "list": "node ./scripts/commands.list",
     "display.vars.debug": "node runner.node.js displayvars.js --sldxenv=debug",
     "artillery.test.vusers": "node runner.artillery.js test-vusers.yml",
-    "artillery.script1": "node runner.artillery.js test-script1.yml",
-    "artillery.script1.debug": "node runner.artillery.js test-script1-debug.yml --sldxenv=debug",
+    "artillery.script1.local": "node runner.artillery.js script1-local.yml",
+    "artillery.script1.local.debug": "node runner.artillery.js script1-local-debug.yml --sldxenv=debug",
     "playwright.script1": "node runner.playwright.js script1.spec.js",
     "playwright.script1.debug": "node runner.playwright.js script1.spec.js --sldxenv=debug --debug",
-    "tools.mongo.script1.debug": "node runner.node.js  ./scripts/tools.mongo.script1.js --sldxenv=debug --debug",
-    "tools.api.script1.debug": "node runner.node.js ./scripts/tools.api.script1.js --sldxenv=debug --debug"
+    "tools.mongo.script1.debug": "node runner.node.js  ./scripts/tools.mongo.script1.js --sldxenv=debu",
+    "tools.api.script1.debug": "node runner.node.js ./scripts/tools.api.script1.js --sldxenv=debug"
   },
   "imports": {
     "#src/*": "./src/*.js",
@@ -57,7 +57,8 @@
     "rimraf": "~5.0.1",
     "stats-incremental": "^1.2.1",
     "strip-ansi": "~6.0",
-    "winston": "~3.10.0"
+    "winston": "~3.10.0",
+    "yaml": "^2.3.1"
   },
   "devDependencies": {
     "@playwright/test": "~1.36.0",

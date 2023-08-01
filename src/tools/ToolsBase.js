@@ -37,6 +37,19 @@ module.exports = class ToolsBase {
     get dryrun() {
         return this.#opts.dryrun === true
     }
+    get myConsole() {
+        return myConsole
+    }
+    /**
+     * Not in console - only in file logger
+     * @param  {...any} args
+     */
+    logFile(...args) {
+        myConsole.loggerDebug.apply(myConsole, args)
+    }
+    /**
+     * log* methods below log in console and file 
+     */
     log(...args) {
         this.loglowlight.apply(this, args)
     }
@@ -113,13 +126,12 @@ module.exports = class ToolsBase {
     }
     async run(method, ...args) {
         try {
-            this.logsuperhighlight(`${method.name} BEGIN`)
             myConsole.initLoggerFromModule(method.name)
-            this.log(JSON.stringify(args))
+            this.logsuperhighlight(`Begin ${method.name}`)
             await this.runBefore.apply(this, [method, ...args])
             await method.apply(this, args)
             await this.runAfter.apply(this, [method, ...args])
-            this.logsuperhighlight(`${method.name} END`)
+            this.logsuperhighlight(`End ${method.name}`)
         } catch (e) {
             this.logerror(`${method.name} FAILED`, e)
             await this.runError.apply(this, [e, method, ...args])

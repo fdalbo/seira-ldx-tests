@@ -46,6 +46,13 @@ module.exports = class ToolsBaseApi extends ToolsBase {
     #httpCli = null
     #httpCliSso = null
     #profiles = null
+    /**
+     * @param {*} opts 
+     * {
+     *      dryrun: true,
+     *      scriptId: null
+     * }
+     */
     constructor(opts) {
         super(opts)
         assert(!_.isEmpty(this.baseUrl), 'Empty baseUrl')
@@ -58,8 +65,8 @@ module.exports = class ToolsBaseApi extends ToolsBase {
         })
     }
     createHttpCli(bearerToken) {
-        this.loghighlight(`\nCreate http client`)
-        this.log(`Token: ${bearerToken}`)
+        this.loghighlight(`Create http client`)
+        this.log(`Token: ${bearerToken.substring(0, 50)}...`)
         this.#httpCli = axios.create({
             baseURL: this.baseUrl,
             timeout: this.scriptConfig.apiCli.timeout,
@@ -138,6 +145,20 @@ module.exports = class ToolsBaseApi extends ToolsBase {
     getFullUrl(path) {
         return `${this.baseUrl}${path}`
     }
+    _logUrl(type, httpCli, method, path) {
+        const text = httpCli == this.#httpCli ? `proxy ${type}` : `sso ${type}`
+        const header = chalk[type == 'request' ? 'magenta' : 'cyan'](text.padEnd(14, ' '))
+        this.log(`[${header}] ${_methodColor[method]}[${httpCli.defaults.baseURL}${path}]`)
+    }
+    logHttpRequest(httpCli, method, path, ...args) {
+        this._logUrl('request', httpCli, method, path)
+        /** file logger only  */
+        this.myConsole.logHttpRequestBody(args)
+    }
+    logHttpResponse(headers, status, data) {
+        this.log(`status[${_okHtpStatus.includes(status) ? chalk.green(status) : chalk.red(status)}]`)
+        this.myConsole.logHttpResponseBody(headers, data)
+    }
     /**
      * @param {*} method 
      * @param {*} path 
@@ -150,33 +171,13 @@ module.exports = class ToolsBaseApi extends ToolsBase {
             this.log(`${chalk.yellow('!!No result')}\n`)
             return {}
         }
-        this.log(`[${httpCli == this.#httpCli ? 'proxy' : 'sso'}] ${_methodColor[method]}[${httpCli.defaults.baseURL}${path}]`)
-
-        this.log(prettyFormat(args))
-        assert(httpCli != null, 'Unexpected empty http client')
-        const { status, data } = await httpCli[method].apply(httpCli, [path, ...args])
-        /** fails if status is no included in _validHtpStatus*/
-        this.log(`status[${_okHtpStatus.includes(status) ? chalk.green(status) : chalk.red(status)}]`)
+        assert(!_.isNil(httpCli), 'Unexpected null http client')
+        this.logHttpRequest.apply(this, [httpCli, method, path, ...args])
+        const { status, data, headers } = await httpCli[method].apply(httpCli, [path, ...args])
+        this.logHttpResponse(headers, status, data)
         if (!_validHtpStatus.includes(status)) {
-            this.logerror(`http status ${status}`)
-            this.log(prettyFormat(data))
-            throw new Error(`http status ${status}`)
+            throw new Error(`http error status[${status}]`)
         }
-        if (status != 404) {
-            let display
-            if (_.isArray(data)) {
-                /** Some requests return an array instead of an object */
-                display = data.slice(0, 1).concat(`length[${data.length}]`).concat('...')
-            } else {
-                display = data
-                if (data.result && _.isArray(data.result)) {
-                    display = Object.assign({}, data)
-                    display.result = data.result.slice(0, 1).concat('...')
-                }
-            }
-            this.log('axios.data', prettyFormat(display))
-        }
-        this.log()
         return status == 404 ? null : data
     }
     async callProxyHttp(...args) {
@@ -245,7 +246,7 @@ module.exports = class ToolsBaseApi extends ToolsBase {
         assert(this.#profiles.admin != null && this.#profiles.teacher != null && this.#profiles.learners.size !== 0,
             `Unexpected empty data\n- admin[${this.#profiles?.admin?.name}] expected[${adminName}]\n- teacher[${this.#profiles?.teacher?.name}] expected[${teacherName}]\n- learnersSize[${this.#profiles?.learners.size}]`
         )
-        this.log(prettyFormat({
+        this.logFile('splitProfiles', prettyFormat({
             admin: this.#profiles.admin,
             teacher: this.#profiles.teacher,
             learnersSize: this.#profiles.learners.size,
@@ -257,7 +258,7 @@ module.exports = class ToolsBaseApi extends ToolsBase {
         return await this.getServerCollection('/careers-publish')
     }
     async deleteAllSession() {
-        this.loghighlight(`\ndeleteAllSession`)
+        this.loghighlight(`deleteAllSession`)
         const sessions = await this.sessions()
         const calls = sessions.result.map(x => ({
             method: 'delete',
@@ -266,7 +267,7 @@ module.exports = class ToolsBaseApi extends ToolsBase {
         return this.batchedCalls('deleteAllSession', calls)
     }
     async deleteSessionByName(sessionName) {
-        this.loghighlight(`\deleteSessionByName [${sessionName}]`)
+        this.loghighlight(`deleteSessionByName [${sessionName}]`)
         assert(!_.isEmpty(sessionName), 'Empty session name')
         const sessions = await this.sessions()
         const session = sessions.result.find(x => x.title === sessionName)
@@ -277,10 +278,10 @@ module.exports = class ToolsBaseApi extends ToolsBase {
         }
     }
     async deleteSessionById(id) {
-        this.loghighlight(`\deleteSessionById [${id}]`)
+        this.loghighlight(`deleteSessionById [${id}]`)
         assert(!_.isEmpty(id), 'Empty session id')
         const result = await this.delete('/server/api/careers-publish-sessions/', id, 'true')
-        this.log(`session id[${id}] deleted`)
+        this.loghighlight(`session id[${id}] deleted`)
     }
     async createTestSession() {
         const sessionName = this.scriptConfig.entities.session.mainName
@@ -291,7 +292,7 @@ module.exports = class ToolsBaseApi extends ToolsBase {
         assert(!_.isEmpty(sessionName), 'Empty career name [config.entities.career.mainName]')
         const profiles = await this.splitProfiles()
         assert(profiles.learners.size >= sessionNbLearners, `Not enougth leaner profiles Exected[${sessionNbLearners}] got[${profiles.learners.size}]`)
-        this.loghighlight(`\nCreate session[${sessionName}] publishedCareerName[${publishedCareerName}] sessionNbLearners[${sessionNbLearners}] teacherName[${profiles.teacher.name}] admin[${profiles.admin.name}]`)
+        this.loghighlight(`Create session[${sessionName}] publishedCareerName[${publishedCareerName}] sessionNbLearners[${sessionNbLearners}]`)
         const sessions = await this.sessions()
         const session = sessions.result.find(x => x.title === sessionName)
         if (session != null) {
@@ -301,7 +302,7 @@ module.exports = class ToolsBaseApi extends ToolsBase {
         const careers = await this.carrersPublished()
         const career = careers.find(x => x.title === publishedCareerName)
         assert(career != null, `Published career title[${publishedCareerName}] not found`)
-        const createdSession = await this.put('/server/api/careers-publish-sessions', _getSessionData({
+        await this.put('/server/api/careers-publish-sessions', _getSessionData({
             sessionName: sessionName,
             /** ?? not _id  */
             careerId: career.id,
@@ -312,7 +313,16 @@ module.exports = class ToolsBaseApi extends ToolsBase {
             individualUserIds: [profiles.teacher._id, profiles.admin._id, ...learnerIds],
             groupIds: []
         }))
-        this.log(`Session title[${sessionName}] created -  Career[${career.title}] learnerIds[${learnerIds.length}]`)
+        this.log(`Session created title[${sessionName}] Career[${career.title}] learners[${learnerIds.length}]`)
+    }
+    /**
+     * Called before lauching test perfs (artillery or playwright)
+     */
+    async resetTestEnvironment() {
+        this.logsuperhighlight(`Begin - resetTestEnvironment`)
+        await this.login()
+        await this.createTestSession()
+        this.logsuperhighlight(`End - resetTestEnvironment`)
     }
     async login() {
         const saveDryrun = this.dryrun

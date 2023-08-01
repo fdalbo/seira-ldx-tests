@@ -17,6 +17,7 @@ const { format: prettyFormat } = require('pretty-format')
 const { pause } = require('#commons/promises')
 const { ARGS_PREFIX, readSldxEnv, readProccessArgument } = require('#env/defaultEnvVars')
 const { traceVariables, initEnvVars } = require('#env/initEnvVars')
+const YAML = require('yaml')
 
 /**
  * Node uncaughtException
@@ -108,6 +109,7 @@ module.exports = async function (mainScriptPath, additionalEnvVars, options) {
             exec: null
         }, options ?? {})
         let exec = options.exec ?? ''
+        let commandExcec = exec
         let childProcessArgs
         let scriptToRunFullPath
         switch (exec) {
@@ -118,15 +120,15 @@ module.exports = async function (mainScriptPath, additionalEnvVars, options) {
             case 'artillery':
                 const reportDir = path.resolve(appRootDir.get(), 'artillery-report')
                 fs.ensureDir(reportDir)
-                const reportName = [path.basename(scriptToRunRelativePath, '.yml'), _replaceDateTags(process.env.SLX_ARTILLERY_REPORT_SUFFIX ?? '')].filter(x => x.length != 0)
+                const reportName = [path.basename(scriptToRunRelativePath, '.yml'), _replaceDateTags(process.env.SLDX_ARTILLERY_REPORT_SUFFIX ?? '')].filter(x => x.length != 0)
                 const reportPath = path.resolve(reportDir, `${reportName.join('-')}.json`)
                 myConsole.highlight(`Report [${reportPath}]`)
                 fs.removeSync(reportPath)
-                scriptToRunFullPath = path.resolve(process.env.SLX_ARTILLERY_ROOT_DIR, scriptToRunRelativePath)
+                scriptToRunFullPath = path.resolve(process.env.SLDX_ARTILLERY_ROOT_DIR, scriptToRunRelativePath)
                 childProcessArgs = ['run', '--output', reportPath, scriptToRunFullPath, ...notEnvVarsArguments]
                 break
             case 'playwright':
-                scriptToRunFullPath = path.resolve(process.env.SLX_PLAYWRIGHT_ROOT_DIR, scriptToRunRelativePath)
+                scriptToRunFullPath = path.resolve(process.env.SLDX_PLAYWRIGHT_ROOT_DIR, scriptToRunRelativePath)
                 exec = 'npx'
                 /** 
                  * npm run playwright.script1 --  --sldxenv=fdalbo --ui 
@@ -140,12 +142,39 @@ module.exports = async function (mainScriptPath, additionalEnvVars, options) {
             default:
                 throw new Error(`Unexpected runner command [${options.exec}] Expected[${_expectedCommands.join(',')}]`)
         }
-        const command = `${exec} ${childProcessArgs.join(' ')}`
+        let command = `${exec} ${childProcessArgs.join(' ')}`
         if (!fs.existsSync(scriptToRunFullPath)) {
             throw new Error(`Command[${command}] - Script file not found\n${scriptToRunFullPath}`)
         }
         if (exec === 'artillery') {
-            myConsole.lowlight(`\nArtillery config:\n${fs.readFileSync(scriptToRunFullPath, { encoding: "utf8" })}\n`)
+            const yamlConfig = fs.readFileSync(scriptToRunFullPath, { encoding: "utf8" })
+            let parsedConfig = null
+            try {
+                parsedConfig = YAML.parse(yamlConfig)
+            } catch (e) {
+                throw new Error(`[artillery] Error parsing YAML file [${scriptToRunFullPath}]`, {
+                    cause: e
+                })
+            }
+            myConsole.lowlight(`\nArtillery config:\n${JSON.stringify(parsedConfig, null, 2)}\n`)
+            const phases = parsedConfig?.config?.phases ?? [{
+                maxVusers: 1,
+                arrivalRate: 1
+            }]
+            if (phases.length > 1) {
+                throw new Error(`[artillery] zero or one phase expected got[${phases.length}] file [${scriptToRunFullPath}]`)
+            }
+            const maxVusers = phases[0].maxVusers ?? 1
+            const arrivalRate = phases[0].arrivalRate ?? 1
+            if (maxVusers != arrivalRate) {
+                throw new Error(`[artillery] YAML config error - Expected maxVusers[${maxVusers}] equals to  arrivalRate[${arrivalRate}]\nFile[${scriptToRunFullPath}]`)
+            }
+            _setRunnerEnvVar(environmentVariables, 'SLDX_ARTILLERY_NB_VUSERS', maxVusers)
+            /** 
+             * We need to add the number of workers
+             * Currently we can launch one script per worker (artillery laucnhes multiple scipts per worker
+             */
+            process.env.WORKERS = maxVusers
         }
         myConsole.highlight(`COMMAND: '${command}'`)
         /** RUN SCRIPT - Execute the script in a child process */
@@ -192,7 +221,7 @@ module.exports = async function (mainScriptPath, additionalEnvVars, options) {
                  */
                 shell: modeShell
             })
-            if (result.exitCode!=0){
+            if (result.exitCode != 0) {
                 myConsole.superhighlight(`Command exited with code [${result.exitCode}]`)
                 process.exit(result.exitCode)
             }

@@ -56,6 +56,13 @@ module.exports.SEIRASSO_COLLECTIONS = _SEIRASSO_COLLECTIONS
 module.exports.ToolsBaseMongo = class ToolsBaseMongo extends ToolsBase {
     #url = null
     #mongoClient = null
+     /**
+     * @param {*} opts 
+     * {
+     *      dryrun: true,
+     *      scriptId: null
+     * }
+     */
     constructor(opts) {
         super(opts)
         this.#url = this.scriptConfig.mongo.url
