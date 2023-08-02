@@ -10,6 +10,7 @@
   "license": "ISC",
   "scripts": {
     "list": "node ./scripts/commands.list",
+    "items": "node ./scripts/command.items.js",
     "display.vars.debug": "node runner.node.js displayvars.js --sldxenv=debug",
     "artillery.test.vusers": "node runner.artillery.js test-vusers.yml",
     "artillery.script1.local": "node runner.artillery.js script1-local.yml",
@@ -57,6 +58,7 @@
     "rimraf": "~5.0.1",
     "stats-incremental": "^1.2.1",
     "strip-ansi": "~6.0",
+    "table": "^6.8.1",
     "winston": "~3.10.0",
     "yaml": "^2.3.1"
   },

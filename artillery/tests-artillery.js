@@ -38,7 +38,7 @@ async function script1(pwPage, userContext, event) {
   }
   process.env.SLDX_LOADED = 'true'
   myConsole.highlight(`ARTILLERY RUN TEST.JS`)
-  await Script1.runScript(__filename, pwPage)
+  await Script1.factoryRun(__filename, pwPage)
 }
 /**
  * VUser tests

@@ -18,5 +18,5 @@ test('RUN SCRIPT1', async ({ page }) => {
   await api.resetTestEnvironment()
   /** https://playwright.dev/docs/test-timeouts */
   test.setTimeout(Script1.scriptTimeout());
-  await Script1.runScript(__filename, page)
+  await Script1.factoryRun(__filename, page)
 });

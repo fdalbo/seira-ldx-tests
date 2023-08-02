@@ -21,7 +21,7 @@ module.exports = {
 
 module.exports = {
     sessions:{
-        /** can handle 100 user max (see /Users/fred/seira/git/playwright/artillery/script1-local.yml maxVusers and arrivalRate) */
+        /** can handle 1000 user max (see /Users/fred/seira/git/playwright/artillery/script1-local.yml maxVusers and arrivalRate) */
         mainNbLearners: 1000
     },
     scenario:{
@@ -30,11 +30,11 @@ module.exports = {
         nbLoopQuiz3: 100
     },
     tempo: {
-        default: 1000,
-        page: 1000,
+        default: 3000,
+        page: 3000,
         radioCheckbox: 1000,
-        cardDisplay: 1000,
-        textInput: 1000,
-        modal: 2000
-    },
+        cardDisplay: 3000,
+        textInput: 2000,
+        modal: 3000
+    }
 }

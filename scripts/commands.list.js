@@ -29,6 +29,6 @@ process.on('uncaughtException', function (err) {
         }
     })
     console.log()
-    await pause(1000)
+    await pause(100)
 })()
 

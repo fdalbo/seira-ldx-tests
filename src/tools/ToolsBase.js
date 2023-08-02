@@ -4,69 +4,28 @@ const prompts = require('prompts')
 const _ = require('lodash')
 const parseArguments = require('minimist')
 const appRootDir = require('app-root-dir')
-const myConsole = require('#commons/myConsole')
-const {
-    initConfig
-} = require(`${appRootDir.get()}/config.base`)
+const Runnable = require('#helpers/Runnable')
+const { initConfig } = require(`${appRootDir.get()}/config.base`)
 
 
-module.exports = class ToolsBase {
+module.exports = class ToolsBase extends Runnable {
     #scriptConfig = null
-    #opts = null
-    constructor(opts) {
-        this.#opts = Object.assign({
+    constructor(name, opts) {
+        super(name, Object.assign({
             dryrun: true,
             scriptId: null
-        }, opts ?? {})
+        }, opts ?? {}))
         this.loghighlight(`New [${this.className}] dryrun[${this.dryrun}] scriptId[${this.opts.scriptId}]`)
         this.#scriptConfig = initConfig(this.opts.scriptId)
-        this.log()
-    }
-    get className() {
-        return this.constructor.name
     }
     get scriptConfig() {
         return this.#scriptConfig
     }
-    get opts() {
-        return this.#opts
-    }
     set dryrun(dryrun) {
-        this.#opts.dryrun = dryrun == true
+        this.opts.dryrun = dryrun == true
     }
     get dryrun() {
-        return this.#opts.dryrun === true
-    }
-    get myConsole() {
-        return myConsole
-    }
-    /**
-     * Not in console - only in file logger
-     * @param  {...any} args
-     */
-    logFile(...args) {
-        myConsole.loggerDebug.apply(myConsole, args)
-    }
-    /**
-     * log* methods below log in console and file 
-     */
-    log(...args) {
-        this.loglowlight.apply(this, args)
-    }
-    loglowlight(...args) {
-        myConsole.lowlight.apply(myConsole, args)
-    }
-    loghighlight(...args) {
-        myConsole.highlight.apply(myConsole, args)
-    }
-    logsuperhighlight(...args) {
-        myConsole.superhighlight.apply(myConsole, args)
-    }
-    logerror(...args) {
-        myConsole.error.apply(myConsole, args)
-    }
-    logwarning(...args) {
-        myConsole.warning.apply(myConsole, args)
+        return this.opts.dryrun === true
     }
     async confirm(message, exitProcess = true) {
         const response = await prompts({
@@ -108,7 +67,7 @@ module.exports = class ToolsBase {
             this.loghighlight(`Operation canceled - exit process`)
             process.exit(1)
         }
-        const actionChoice = actionChoices.find (x=>x.value === reponse.value)
+        const actionChoice = actionChoices.find(x => x.value === reponse.value)
         this.log(JSON.stringify(actionChoice))
         const method = this[actionChoice.value]
         if (!_.isFunction(method)) {
@@ -116,26 +75,7 @@ module.exports = class ToolsBase {
             process.exit(1)
         }
         confirm === true && await this.confirm(`Confirm action '${actionChoice.value}'`)
-        await this.run.apply(this, [method, ...actionChoice.args ?? []])
-    }
-    async runBefore(method, ...args) {
-    }
-    async runAfter(method, ...args) {
-    }
-    async runError(e, method, ...argse) {
-    }
-    async run(method, ...args) {
-        try {
-            myConsole.initLoggerFromModule(method.name)
-            this.logsuperhighlight(`Begin ${method.name}`)
-            await this.runBefore.apply(this, [method, ...args])
-            await method.apply(this, args)
-            await this.runAfter.apply(this, [method, ...args])
-            this.logsuperhighlight(`End ${method.name}`)
-        } catch (e) {
-            this.logerror(`${method.name} FAILED`, e)
-            await this.runError.apply(this, [e, method, ...args])
-        }
+        await this.runMethod.apply(this, [method, ...actionChoice.args ?? []])
     }
     static async factory(opts) {
         const minimistOpts = {
@@ -143,10 +83,9 @@ module.exports = class ToolsBase {
         }
         const args = parseArguments(process.argv, minimistOpts)
         const dryrun = args.dryrun ?? 'true'
-        const client = new this(Object.assign({
+        /** this is important */
+        return Runnable.factory.call(this, Object.assign({
             dryrun: dryrun === 'true'
         }, opts ?? {}))
-        myConsole.superhighlight(`dryrun[${client.dryrun}]`)
-        return client
     }
 }

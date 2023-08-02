@@ -109,7 +109,6 @@ module.exports = async function (mainScriptPath, additionalEnvVars, options) {
             exec: null
         }, options ?? {})
         let exec = options.exec ?? ''
-        let commandExcec = exec
         let childProcessArgs
         let scriptToRunFullPath
         switch (exec) {
@@ -182,18 +181,6 @@ module.exports = async function (mainScriptPath, additionalEnvVars, options) {
         _setRunnerEnvVar(environmentVariables, 'SLDX_RUNNER_SCRIPT_NAME', scriptName)
         /** node, artillery, playwright */
         _setRunnerEnvVar(environmentVariables, 'SLDX_RUNNER_EXEC', options.exec)
-        let res = {
-            command: null,
-            escapedCommand: null,
-            exitCode: null,
-            stdout: null,
-            stderr: null,
-            all: null,
-            failed: null,
-            timedOut: null,
-            isCanceled: null,
-            killed: null,
-        }
         try {
             /** ALl variables befroe running the command */
             traceVariables(environmentVariables)
@@ -226,8 +213,7 @@ module.exports = async function (mainScriptPath, additionalEnvVars, options) {
                 process.exit(result.exitCode)
             }
         } catch (e) {
-            console.log('subprocess', prettyFormat(res))
-            console.log('excp', prettyFormat(e))
+            console.log('exception', prettyFormat(e))
             /** 
              * The original cause thrown by the script is not present (e.cause)
              * --> We need to put a ty{}catch (e) {myConsole.error("ERROR", e)} in the script

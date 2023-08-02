@@ -2,10 +2,10 @@
 config:
   target: http://localhost:2020/
   phases:
-    - name: Warm up phase
-      duration: 10
-      maxVusers: 15
-      arrivalRate: 15
+    - name: testSeira
+      duration: 40
+      maxVusers: 40
+      arrivalRate: 40
 
 #--------------------------------------------------------------------------------
 # The following example creates 20 virtual users in 60 seconds (one virtual user approximately every 3 seconds):

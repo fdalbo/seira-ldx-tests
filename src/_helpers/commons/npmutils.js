@@ -37,7 +37,7 @@ const _commandsList = async (textSearched) => {
                     const entries = Object.entries(data.scripts)
                     res.idx = workspaceIdx
                     res.workspaces = data.workspaces ?? []
-                    res.title = chalk.magenta(`${workspaceIdx} Commands list ${res.name.toUpperCase()}:`)
+                    res.title = chalk.magenta(`Commands list:`)
                     res.scripts = []
                     if (!_.isEmpty(textSearched) && res.scripts.length === 0) {
                         res.noScriptTitle = chalk.yellow(`No script found for text search '${textSearched}'`)
@@ -45,9 +45,9 @@ const _commandsList = async (textSearched) => {
                         res.noScriptTitle = chalk.yellow(`No script`)
                     }
                     if (entries.length > 0) {
-                        let i = 0
+                        let itemIdx = 0
                         for (const [scriptName, npmCommand] of entries) {
-                            i++
+                            itemIdx++
                             let displayedScriptName = scriptName
                             if (!_.isEmpty(textSearched)) {
                                 displayedScriptName = scriptName.replace(textSearchRegexp, chalk.whiteBright('$&'))
@@ -55,12 +55,11 @@ const _commandsList = async (textSearched) => {
                                     continue
                                 }
                             }
-                            const itemIdx = `${workspaceIdx}.${i}`
                             const cmd = `npm run ${displayedScriptName} ${workspace ? `-w ${workspace}` : ''}`
                             res.scripts.push({
                                 idx: itemIdx,
                                 cmd: cmd,
-                                title: _chalk(cmd)
+                                title: _chalk(`${`npm run items ${itemIdx}`.padEnd(30, ' ')} ${cmd}`)
                             })
                         }
                     }

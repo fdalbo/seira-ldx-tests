@@ -6,6 +6,17 @@ const { format: prettyFormat } = require('pretty-format')
 const chalk = require('chalk')
 const assert = require('assert')
 const ToolsBase = require('./ToolsBase')
+const { table } = require('table');
+
+const _sortProfiles = (a, b) => {
+    const aIdx = parseInt(a.name.match(/([0-9]+$)/))
+    const bIdx = parseInt(b.name.match(/([0-9]+$)/))
+    if (isNaN(aIdx) || isNaN(bIdx)) {
+        return a.name.localeCompare(b.name)
+    }
+    return aIdx > bIdx ? 1 : aIdx < bIdx ? -1 : 0
+}
+
 
 // http://seira-ldx.seiralocaltest/alerting/api/system/session-head-teacher-added
 const _getSessionData = ({ sessionName, careerId, coaches, individualUserIds, groupIds }) => {
@@ -126,8 +137,9 @@ module.exports = class ToolsBaseApi extends ToolsBase {
     }
     get actionChoices() {
         return [
-            { title: 'Get groups', description: `Get groups`, value: this.groups.name },
-            { title: 'Get sessions', description: `Get sessions`, value: this.sessions.name },
+            { title: 'Get groups', description: `Get groups`, value: this.groups.name, args: [true] },
+            { title: 'Get sessions', description: `Get sessions`, value: this.sessions.name, args: [true] },
+            { title: 'Get profiles', description: `Get profiles`, value: this.profiles.name, args: [true] },
             { title: 'splitProfiles', description: `splitProfiles`, value: this.splitProfiles.name },
             { title: 'Get carrersPublished', description: `Get carrersPublished`, value: this.carrersPublished.name },
             { title: 'deleteAllSession', description: `deleteAllSession`, value: this.deleteAllSession.name },
@@ -144,6 +156,33 @@ module.exports = class ToolsBaseApi extends ToolsBase {
     }
     getFullUrl(path) {
         return `${this.baseUrl}${path}`
+    }
+    _displayAsTable(array, opts) {
+        array ??= []
+        opts = Object.assign({
+            nbCols: 5,
+            property: '_id',
+            cell: (item, idx) => item == null ? item : item[opts.property] ?? `[${idx}] ${opts.property} missing`,
+            nbRecords: -1
+        }, opts ?? {})
+        const result = []
+        let buffer = []
+        const length = Math.min(opts.nbRecords > 0 ? opts.nbRecords : array.length, array.length)
+        for (let idx = 0; idx < length; idx++) {
+            const item = array[idx]
+            buffer.push(opts.cell(item, idx))
+            if (buffer.length >= opts.nbCols) {
+                result.push(buffer)
+                buffer = []
+            }
+        }
+        if (buffer.length === opts.nbCols) {
+            result.push(buffer)
+        } else if (buffer.length > 0) {
+            for (let i = buffer.length; i < opts.nbCols; i++) buffer[i] = array.length > length ? '...' : ''
+            result.push(buffer)
+        }
+        this.log(`length[${array.length}] property[${opts.property}]\n${table(result)}`)
     }
     _logUrl(type, httpCli, method, path) {
         const text = httpCli == this.#httpCli ? `proxy ${type}` : `sso ${type}`
@@ -201,24 +240,38 @@ module.exports = class ToolsBaseApi extends ToolsBase {
         // this.log(prettyFormat(data))
         return await this.callProxyHttp('put', path, data)
     }
-    getSsoCollection(path) {
-        return this.get(`/generic-db-api/api/collections/seirasso${path}`)
+    async getSsoCollection(path, sort) {
+        const data = await this.get(`/generic-db-api/api/collections/seirasso${path}`)
+        if (sort) {
+            data.result = data.result.sort(sort)
+        }
+        return data
     }
     /** not 'rustified' */
-    getServerCollection(path) {
+    async getServerCollection(path) {
         return this.get(`/server/api${path}`)
     }
-    getSeiraCollection(path) {
+    async getSeiraCollection(path) {
         return this.get(`/generic-db-api/api/collections/seiradb${path}`)
     }
-    async groups() {
-        return await this.getSsoCollection('/Group/*/10000/$limit')
+    displayCollection(data, opts) {
+        this._displayAsTable(data.result, opts)
     }
-    async sessions() {
-        return this.getSeiraCollection('/PublishedCareerSession/*/10000/$limit')
+    async groups(displayResult = false) {
+        const data = await this.getSsoCollection('/Group/*/10000/$limit')
+        displayResult === true && this.displayCollection(data, { nbCols: 4, property: 'name' })
+        return data
     }
-    async profiles() {
-        return await this.getSsoCollection('/Profile/*/10000/$limit')
+    async sessions(displayResult = false) {
+        const data = await this.getSeiraCollection('/PublishedCareerSession/*/10000/$limit')
+        displayResult === true && this.displayCollection(data, { property: 'title' })
+        return data
+    }
+    async profiles(displayResult = false) {
+        /** !! sorted by name testperfs.leaner.idx - Important because the user names is retreived by the worker index in artillery test */
+        const data = await this.getSsoCollection('/Profile/*/10000/$limit',  _sortProfiles)
+        displayResult === true && this.displayCollection(data, { property: 'name', nbRecords: 200 })
+        return data
     }
     async splitProfiles() {
         const teacherName = this.scriptConfig.entities.teacher.name

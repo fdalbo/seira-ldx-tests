@@ -12,10 +12,16 @@ exports.ROLE_LEARNER = 'learner'
 exports.ROLE_TEACHER = 'teacher'
 exports.ROLE_ADMIN = 'admin'
 exports.TEMPO_PAGE = 'page'
+exports.TEMPO_LIST_DETAIL_SESSION = 'listDetailSession'
 exports.TEMPO_RADIO = 'radioCheckbox'
 exports.TEMPO_CARD_DISPLAY = 'cardDisplay'
 exports.TEMPO_TEXT_INPUT = 'textInput'
 exports.TEMPO_MODAL = 'modal'
+exports.TEMPO_SCREENSHOT = 'secreenShot'
+exports.TEMPO_LOGIN = 'login'
+exports.TEMPO_RETRY_READ_DOM = 'retryReadDom'
+
+
 
 
 const _getArtilleryLearnerName = () => {
@@ -58,7 +64,7 @@ const _baseConfig = {
         },
         learner: {
             /** many learners testperfs.learner.1, .2 ... */
-            id: null, 
+            id: null,
             prefix: process.env.SLDX_LEARNER_PREFIX,
             password: process.env.SLDX_LEARNER_PWD,
             encryptedPwd: process.env.SLDX_LEARNER_ENCRYPTED_PWD,
@@ -78,18 +84,22 @@ const _baseConfig = {
             mainNbLearners: 100
         },
         career: {
-            mainName:  `${process.env.SLDX_CAREER_PREFIX}main`,
+            mainName: `${process.env.SLDX_CAREER_PREFIX}main`,
         }
     },
-    apiCli:{
+    apiCli: {
         timeout: 1000
     },
     mongo: {
         host: process.env.SLDX_MONGO_HOST,
         port: process.env.SLDX_MONGO_PORT,
-        url:  process.env.SLDX_MONGO_URL
+        url: process.env.SLDX_MONGO_URL
     },
     tempo: {
+        retryReadDom: 3000,
+        listDetailSession: 3000,
+        login: 2000,
+        secreenShot: 5000,
         default: 2000,
         page: 2000,
         radioCheckbox: 2000,

@@ -1,12 +1,13 @@
 'use strict';
 
-const myConsole = require('#commons/myConsole')
 const { pause } = require('#commons/promises')
 const path = require('path')
 const _ = require('lodash')
 const appRootDir = require('app-root-dir')
 const Stats = require('stats-incremental')
+const assert = require('assert')
 const CSVStream = require('#helpers/CsvStream')
+const Runnable = require('#helpers/Runnable')
 const {
     isMainThread,
     parentPort: _workerParentPort,
@@ -19,10 +20,14 @@ const {
     initConfig,
     ROLE_LEARNER,
     TEMPO_PAGE,
+    TEMPO_LIST_DETAIL_SESSION,
     TEMPO_RADIO,
     TEMPO_CARD_DISPLAY,
     TEMPO_TEXT_INPUT,
-    TEMPO_MODAL
+    TEMPO_MODAL,
+    TEMPO_SCREENSHOT,
+    TEMPO_LOGIN,
+    TEMPO_RETRY_READ_DOM
 } = require(`${appRootDir.get()}/config.base`)
 const _METRIC_CARDS = 'cards'
 const _METRIC_QUIZ = 'quiz'
@@ -45,6 +50,7 @@ const _CLICKABLE = {
             label: 'Apprenant',
             selector: '#learner',
             type: _TYPE_MENU,
+            /** Tests show that this actions needs more time to dipslay the page */
             tempo: TEMPO_PAGE,
             metric: _METRIC_NAV
         }
@@ -95,6 +101,7 @@ const _CLICKABLE = {
             label: 'démarrer',
             metric: _METRIC_NAV,
             role: _PW_ROLE_BUTTON,
+            tempo: TEMPO_PAGE,
             type: _TYPE_BUTTON
         },
         MODALOK: {
@@ -132,16 +139,14 @@ const _CLICKABLE = {
             /** dynamic */
             label: null,
             metric: _METRIC_NAV,
-            tempo: TEMPO_PAGE,
+            tempo: TEMPO_LIST_DETAIL_SESSION,
             type: _TYPE_LIST_ITEM
         }
 
     }
 }
-module.exports = class ScriptRunner {
+module.exports = class ScriptRunner extends Runnable {
     stepIdx = 0
-    name = null
-    pwPage = null
     config = null
     learnerName = null
     learnerRole = null
@@ -149,19 +154,21 @@ module.exports = class ScriptRunner {
     errorIdx = 0
     metrics = null
     csvStream = null
-    constructor(scriptFilePath, pwPage) {
-        this.log(`NEW ScriptRunner`)
-        this.name = path.basename(scriptFilePath)
-        this.pwPage = pwPage
+    constructor(opts) {
+        super(opts)
+        assert(!_.isEmpty(this.scriptFilePath), 'Unexpected empty scriptFilePath')
+        assert(!_.isNil(this.pwPage), 'Unexpected empty pwPage')
+        this.loghighlight(`Script runner launched from[${this.scriptFilePath}]`)
         this.config = initConfig(this.className.toLowerCase())
         this.scenario = this.config.scenario ?? {}
         this.learnerName = this.config.getLearnerName()
         this.learnerRole = this.config?.entities?.learner?.role ?? 'empty'
         /** see https://playwright.dev/docs/api/class-page#page-set-default-navigation-timeout  */
-        pwPage.setDefaultNavigationTimeout(this.config.timeouts.defaultNavigationTimeout ?? 1000)
+        this.pwPage.setDefaultNavigationTimeout(this.config.timeouts.defaultNavigationTimeout ?? 1000)
         /** seehttps://playwright.dev/docs/api/class-page#page-set-default-timeout */
-        pwPage.setDefaultTimeout(this.config.timeouts.defaultTimeout ?? 1000)
+        this.pwPage.setDefaultTimeout(this.config.timeouts.defaultTimeout ?? 1000)
     }
+    /** overriden */
     async asyncInit() {
         /** Metric */
         if (process.env.SLDX_METRICS_ENABLED == 'true') {
@@ -172,19 +179,25 @@ module.exports = class ScriptRunner {
             for (const metricId of _METRICS) {
                 this.metrics.stats[metricId] = Stats()
             }
-            this.logHighlight(`Metrics are enabled [${_METRICS.join(',')}]`)
+            this.loghighlight(`Metrics are enabled [${_METRICS.join(',')}]`)
             this.csvStream = new CSVStream({
                 headers: true,
                 override: true,
-                filePath: path.resolve(process.env.SLDX_METRICS_DIR_PATH, `${myConsole.threadId}-metrics.csv`),
+                filePath: path.resolve(process.env.SLDX_METRICS_DIR_PATH, `${this.threadId}-metrics.csv`),
                 writeProperties: ['value', 'n', 'min', 'max', 'mean', 'variance', 'label']
             })
         } else {
-            this.logHighlight(`Metrics are disabled (SLDX_METRICS_ENABLED!=true)`)
+            this.loghighlight(`Metrics are disabled (SLDX_METRICS_ENABLED!=true)`)
         }
     }
-    get className() {
-        return this.constructor.name
+    get pwPage() {
+        return this.opts.pwPage
+    }
+    get scriptFilePath() {
+        return this.opts.scriptFilePath
+    }
+    geLogName(method) {
+        return this.learnerName
     }
     isPlayWright() {
         return this.config.exec === 'playwright'
@@ -210,28 +223,34 @@ module.exports = class ScriptRunner {
     async saveScreenShot(selector, filename) {
         try {
             if (this.pwPage) {
-                const ssPath = path.resolve(process.env.SLDX_SCREENSHOTS_DIR_PATH, `${myConsole.threadId}${filename}.png`)
-                this.logHighlight(`Save screenshot [${ssPath}]`)
+                const ssPath = (idx) => path.resolve(process.env.SLDX_SCREENSHOTS_DIR_PATH, `${this.threadId}${filename}.${idx}.png`)
+                this.loghighlight(`Save screenshot [${ssPath(1)}]`)
                 await this.pwPage.locator(selector).screenshot({
                     animations: 'disabled',
                     type: 'png',
-                    path: ssPath
+                    path: ssPath(1)
+                })
+                /** Let some time to display the page and to compare the 2 screen shots*/
+                await pause(this.config.tempo[TEMPO_SCREENSHOT])
+                await this.pwPage.locator(selector).screenshot({
+                    animations: 'disabled',
+                    type: 'png',
+                    path: ssPath(2)
                 })
             }
         } catch (e) {
-            myConsole.warning(`Error saving the screenshot`, e)
+            this.logwarning(`Error saving the screenshot`, e)
         }
     }
     async throwError(message, throwError = true) {
         this.errorIdx++
-        await pause (1000)
         await this.saveScreenShot('body', `error_${this.errorIdx++}`)
-        message = `[${myConsole.threadId}] [${this.learnerName ?? 'no learner'}] ${message}`
+        message = `[${this.threadId}] [${this.learnerName ?? 'no learner'}] ${message}`
         if (throwError == true) {
-            myConsole.error('A fatal error occured (see screenshot)', new Error(message))
+            this.logerror('A fatal error occured (see screenshot)', new Error(message))
             throw new Error(message)
         } else {
-            myConsole.error('A non-fatal error occured', new Error(message))
+            this.logerror('A non-fatal error occured', new Error(message))
         }
     }
     getStat(id) {
@@ -245,7 +264,7 @@ module.exports = class ScriptRunner {
             const data = {
                 type: 'METRICS',
                 id: clickInfo.metric,
-                emitter: myConsole.threadId,
+                emitter: this.threadId,
                 data: {
                     value: value,
                     n: stats.n,
@@ -262,7 +281,7 @@ module.exports = class ScriptRunner {
             }
             this.csvStream.write(data.emitter, data.id, data.data)
         } catch (e) {
-            myConsole.error('Error Sending metrics', e)
+            this.logerror('Error Sending metrics', e)
         }
     }
     async updateMetric(clickInfo, elapsedMs) {
@@ -272,7 +291,7 @@ module.exports = class ScriptRunner {
         }
         const stats = this.getStat(metricId)
         if (!stats) {
-            myConsole.warning(`Metric id[${metricId}] not found`)
+            this.logwarning(`Metric id[${metricId}] not found`)
             return
         }
         stats.update(elapsedMs)
@@ -289,7 +308,7 @@ module.exports = class ScriptRunner {
      * @param  {...any} args  (args for callbackMethod)
      */
     async applyAndMesure(clickInfo, tempo, callbackObj, callbackMethod, ...args) {
-        _verbose && this.log(`click.${clickInfo.type}.${clickInfo.label}`)
+        this.log(`click.${clickInfo.type}.${clickInfo.label}`)
         const t0 = new Date().getTime()
         await callbackMethod.apply(callbackObj, args)
         const elapsedMs = new Date().getTime() - t0
@@ -321,15 +340,15 @@ module.exports = class ScriptRunner {
         tempo ??= this.config.tempo.default
         if (_.isString(tempo)) {
             if (!this.config.tempo[tempo]) {
-                this.throwError(`Config - Unknown cinfog.tempo[${tempo}]`)
+                await this.throwError(`Config - Unknown config.tempo[${tempo}]`)
             }
             tempo = this.config.tempo[tempo]
         }
         const tempoMs = parseInt(tempo)
         if (isNaN(tempoMs)) {
-            this.throwError(`Config - Bad 'tempo' value [${tempoMs}ms/${tempo}]`)
+            await this.throwError(`Config - Bad 'tempo' value [${tempoMs}ms/${tempo}]`)
         }
-        this.log(`[${new String(this.stepIdx++).padStart(2, 0)}] page[${this.pwPageId()}] tempoMs[${tempoMs}]`)
+        this.log(`[${new String(this.stepIdx++).padStart(2, 0)}] pause page[${this.pwPageId()}] tempoMs[${tempoMs}]`)
         await pause(tempoMs);
     }
     async clickMenuApprenant(tempo) {
@@ -354,26 +373,38 @@ module.exports = class ScriptRunner {
     async clickDemarrerParcours(tempo) {
         const selectorPageDetailSession = 'button.start-button-cta  > .mat-button-wrapper > span'
         const selectorPageApprenant = '.card-aside > .mat-flat-button > .mat-button-wrapper'
-        /** 
-         * https://playwright.dev/docs/api/class-elementhandle#element-handle-inner-html
-         * ElementHandle returns null if not found contrary to locator
-         */
-        let element = await this.selector(selectorPageDetailSession)
-        let text = null
-        if (element != null) {
-            this.log('Career starts from user session\'s page')
-            text = await element.innerHTML()
-        } else {
-            element = await this.selector(selectorPageApprenant)
+        const expectedText = 'démarrer'
+        const _tryReadStartButton = async () => {
+            /** 
+            * https://playwright.dev/docs/api/class-elementhandle#element-handle-inner-html
+            * ElementHandle returns null if not found contrary to locator
+            */
+            let element = await this.selector(selectorPageDetailSession)
+            let innerHtml = null
             if (element != null) {
-                this.log('Career starts from learner\' homre welcome session')
-                text = await element.innerHTML()
+                this.log('Career starts from user session\'s page')
+                innerHtml = await element.innerHTML()
             } else {
-                this.throwError(`Career starts from an unknownn page`)
+                element = await this.selector(selectorPageApprenant)
+                if (element != null) {
+                    this.log('Career starts from learner\' homre welcome session')
+                    innerHtml = await element.innerHTML()
+                }
             }
+            return (innerHtml ?? '').trim()
         }
-        if (_.isEmpty(text) || text.toLowerCase() != 'démarrer') {
-            this.throwError(`User[${this.learnerName}] - Unexpected 'start career' button - Expected[démarrer] Got[${text}]`)
+        let buttonText
+        let nbRetry = 2
+        do {
+            buttonText = await _tryReadStartButton()
+            if (_.isEmpty(buttonText)) {
+                nbRetry--
+                this.logwarning(`Can't read '${expectedText}' button - retry[${nbRetry}] retryPause[${this.config.tempo[TEMPO_RETRY_READ_DOM]}]`)
+                await this.tempo(TEMPO_RETRY_READ_DOM)
+            }
+        } while (_.isEmpty(buttonText) && nbRetry > 0)
+        if (_.isEmpty(buttonText) || buttonText.toLowerCase() != expectedText) {
+            await this.throwError(`User[${this.learnerName}] - Career starts from an unknownn page - ExpectedButton[${expectedText}] GotButton[${buttonText}]`)
         }
         await this.clickByRole(_CLICKABLE.BUTTONS.DEMARRER, tempo)
     }
@@ -382,23 +413,23 @@ module.exports = class ScriptRunner {
         await this.pwPage.getByLabel(label).fill(value)
         await this.tempo(tempo ?? TEMPO_TEXT_INPUT)
     }
-    _checkClickInfo(clickInfo) {
+    async _checkClickInfo(clickInfo) {
         if (!_.isPlainObject(clickInfo) || _.isEmpty(clickInfo.label) || _.isEmpty(clickInfo.type)) {
-            this.throwError(`_checkClickInfo expects an object with at least a label and a type - clickInfo[${clickInfo ? JSON.stringify(clickInfo, null, 2) : 'null'}]`)
+            await this.throwError(`_checkClickInfo expects an object with at least a label and a type - clickInfo[${clickInfo ? JSON.stringify(clickInfo, null, 2) : 'null'}]`)
         }
     }
-    _checkClickable(object, clickInfo) {
+    async _checkClickable(object, clickInfo) {
         if (!object) {
-            this.throwError(`_checkClickable unexpected null object - clickInfo[${JSON.stringify(clickInfo, null, 2)}]`)
+            await this.throwError(`_checkClickable unexpected null object - clickInfo[${JSON.stringify(clickInfo, null, 2)}]`)
         }
         if (!object.click) {
-            this.throwError(`_checkClickable unexpected null object.click method - clickInfo[${JSON.stringify(clickInfo, null, 2)}]`)
+            await this.throwError(`_checkClickable unexpected null object.click method - clickInfo[${JSON.stringify(clickInfo, null, 2)}]`)
         }
     }
     async clickBySelector(clickInfo, tempo) {
-        this._checkClickInfo(clickInfo)
+        await this._checkClickInfo(clickInfo)
         if (_.isEmpty(clickInfo.selector)) {
-            this.throwError(`clickBySelector: unexpected empty clickInfo.selector`)
+            await this.throwError(`clickBySelector: unexpected empty clickInfo.selector`)
         }
         _verbose && this.log(`clickBySelector '${clickInfo.selector}'`)
         const locator = await this.locator(clickInfo.selector)
@@ -427,22 +458,22 @@ module.exports = class ScriptRunner {
         await this.clickByRole(_CLICKABLE.BUTTONS.MODALCANCEL, tempo)
     }
     async clickByRole(clickInfo, tempo = null) {
-        this._checkClickInfo(clickInfo)
+        await this._checkClickInfo(clickInfo)
         if (!clickInfo.role) {
-            this.throwError(`clickByRole - clickInfo.role is empty`)
+            await this.throwError(`clickByRole - clickInfo.role is empty`)
         }
         const locator = await this.pwPage.getByRole(clickInfo.role, { name: clickInfo.label })
         await this.clickByLocator(locator, clickInfo, tempo)
     }
     async clickByLocator(locator, clickInfo, tempo) {
         if (locator == null) {
-            this.throwError(`clickByLocator: unexpected null locator ${JSON.stringify(clickInfo)}`)
+            await this.throwError(`clickByLocator: unexpected null locator ${JSON.stringify(clickInfo)}`)
         }
-        this._checkClickable(locator, clickInfo)
+        await this._checkClickable(locator, clickInfo)
         await this.applyAndMesure(clickInfo, tempo, locator, locator.click)
     }
     async clickByText(textInfo, tempo = null) {
-        this._checkClickInfo(textInfo)
+        await this._checkClickInfo(textInfo)
         const locator = await this.pwPage.getByText(textInfo.label)
         await this.clickByLocator(locator, textInfo, tempo)
     }
@@ -456,21 +487,18 @@ module.exports = class ScriptRunner {
         await this.clickByRole(_CLICKABLE.BUTTONS.CONNECTION, tempo)
     }
     async gotoPage(pageInfo, tempo) {
-        this._checkClickInfo(pageInfo)
+        await this._checkClickInfo(pageInfo)
         if (!pageInfo.path) {
-            this.throwError(`gotoPage - pageInfo.path is empty`)
+            await this.throwError(`gotoPage - pageInfo.path is empty`)
         }
         const url = this.fullUrl(pageInfo.path)
         this.log(`gotoPage ${url}`)
         await this.applyAndMesure(pageInfo, tempo, this.pwPage, this.pwPage.goto, url)
     }
-    log(message) {
-        myConsole.lowlight.call(myConsole, message)
+    async runError(e, ...args) {
+        throw (e)
     }
-    logHighlight(message) {
-        myConsole.highlight.call(myConsole, message)
-    }
-    async run() {
+    async runStart() {
         try {
             const traceEnv = []
             for (const [key, value] of Object.entries(process.env)) {
@@ -481,19 +509,19 @@ module.exports = class ScriptRunner {
             await this.beforeLogin()
             await this.login()
             await this.afterLogin()
-            await this.beforeEnd()
+            await this.beforeScriptEnd()
         } finally {
             this.log(`END RUN ${this.name}`)
             this.csvStream && this.csvStream.destroy()
         }
     }
     async login(tempo) {
-        this.logHighlight(`login ${this.learnerName}/${this.config.getUserPwd()} [${this.learnerRole}]`)
+        this.loghighlight(`login ${this.learnerName}/${this.config.getUserPwd()} [${this.learnerRole}]`)
         await this.gotoPage(_CLICKABLE.PAGES.CLIENT)
         await this.fillLabel('Veuillez entrer votre identifiant ou e-mail *', this.learnerName)
         await this.fillLabel('Mot de passe : *', this.config.getUserPwd())
         await this.clickConnect()
-        await pause(1000)
+        await this.tempo(TEMPO_LOGIN)
     }
     async assertSessionProgression(percent) {
         const expectedPogress = `${percent}%`
@@ -503,65 +531,43 @@ module.exports = class ScriptRunner {
          * Eg: npm run playwright.script1 --  --sldxenv=fdalbo --sldxpwuser=user3 --ui
          */
         if ((this.isArtillery() || !this.isPlayWrightUi()) && expectedPogress != sessionProgress) {
-            this.throwError(`unexpected session progression for user[${this.learnerName}] - Expected[${expectedPogress}] - Got[${sessionProgress}]`)
+            await this.throwError(`unexpected session progression for user[${this.learnerName}] - Expected[${expectedPogress}] - Got[${sessionProgress}]`)
         }
     }
     async getSessionProgression() {
         const progress = await this.locator('app-progress-bar .percentage-progression').innerHTML()
-        this.logHighlight(`Progession [${progress}]`)
+        this.loghighlight(`Progession [${progress}]`)
         return progress
     }
-    
     async beforeLogin() {
-        this.logHighlight(`beforeLogin`)
+        this.loghighlight(`beforeLogin`)
     }
     async afterLogin() {
-        this.logHighlight(`afterLogin`)
+        this.loghighlight(`afterLogin`)
         await this.clickMenuApprenant()
         if (this.learnerRole = ROLE_LEARNER) {
             await this.learnerCheckSatus()
         } else {
             /** In case we want to develop scenarri for other  user roles */
-            this.throwError(`Unexpected user role[${this.learnerName}.${this.learnerRole}] - Expected[${ROLE_LEARNER}]`)
+            await this.throwError(`Unexpected user role[${this.learnerName}.${this.learnerRole}] - Expected[${ROLE_LEARNER}]`)
         }
     }
     async learnerCheckSatus() {
         await this.assertSessionProgression(0)
     }
-    async beforeEnd() {
+    async beforeScriptEnd() {
         await pause(1000);
     }
-    async initTestContext(){
-
-    }
-    /**
-     * @returns the runner
-     */
-    static async factory(scriptFilePath, pwPage) {
-        const runner = new this(scriptFilePath, pwPage)
-        await runner.asyncInit()
-        return runner
-    }
-    static async runScript(scriptFilePath, pwPage) {
-        let runError = null
-        try {
-            myConsole.initLoggerFromModule(this.name.toLowerCase())
-            myConsole.superhighlight(`BEGIN RUN ${this.name}`)
-            myConsole.lowlight(`From [${scriptFilePath}]`)
-            if (_.isEmpty(process.env.SLDX_RUNNER_EXEC)) {
-                myConsole.warning(`\n\nProcess must be launched by the runner\n- npm run artillery.script1 --  --sldxenv=playwright.debug\n- npm run playwright.script1 --  --sldxenv=playwright.debug --sldxpwuser=user4 --debug\n\n`)
-                throw new Error(`Process must be launched by the runner`)
-            }
-            const runner = new this(scriptFilePath, pwPage)
-            await runner.asyncInit()
-            await runner.run()
-        } catch (e) {
-            myConsole.error(`Error running ${this.className}`, e)
-            runError = true
-            throw e
-        } finally {
-            myConsole.superhighlight(`END RUN ${runError ? 'KO' : 'OK'} ${this.className}`)
+    static async factoryRun(scriptFilePath, pwPage) {
+        if (_.isEmpty(process.env.SLDX_RUNNER_EXEC)) {
+            this.logwarning(`\n\nProcess must be launched by the runner\n- npm run artillery.script1 --  --sldxenv=playwright.debug\n- npm run playwright.script1 --  --sldxenv=playwright.debug --sldxpwuser=user4 --debug\n\n`)
+            throw new Error(`Process must be launched by the runner`)
         }
+        await Runnable.factoryRun.apply(this, [{
+            name: this.name.toLocaleLowerCase(),
+            scriptFilePath: scriptFilePath,
+            pwPage: pwPage
+        }])
     }
     static scriptTimeout() {
         const to = parseInt(process.env.SLDX_PLAYWRIGTH_SCRIPT_TIMEOUT)
@@ -570,5 +576,4 @@ module.exports = class ScriptRunner {
         }
         return to
     }
-
 }
