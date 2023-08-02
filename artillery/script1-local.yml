@@ -3,9 +3,9 @@ config:
   target: http://localhost:2020/
   phases:
     - name: testSeira
-      duration: 40
-      maxVusers: 40
-      arrivalRate: 40
+      duration: 50
+      maxVusers: 50
+      arrivalRate: 50
 
 #--------------------------------------------------------------------------------
 # The following example creates 20 virtual users in 60 seconds (one virtual user approximately every 3 seconds):

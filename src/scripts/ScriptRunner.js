@@ -4,18 +4,13 @@ const { pause } = require('#commons/promises')
 const path = require('path')
 const _ = require('lodash')
 const appRootDir = require('app-root-dir')
-const Stats = require('stats-incremental')
 const assert = require('assert')
-const CSVStream = require('#helpers/CsvStream')
 const Runnable = require('#helpers/Runnable')
 const {
     isMainThread,
-    parentPort: _workerParentPort,
-    workerData: _workerData,
-    threadId: _workertThreadId
+    BroadcastChannel,
 } = require('worker_threads')
 const _verbose = false
-const _sendToMainThread = false
 const {
     initConfig,
     ROLE_LEARNER,
@@ -27,12 +22,18 @@ const {
     TEMPO_MODAL,
     TEMPO_SCREENSHOT,
     TEMPO_LOGIN,
-    TEMPO_RETRY_READ_DOM
+    TEMPO_RETRY_READ_DOM,
+    METRIC_CARDS,
+    METRIC_QUIZ,
+    METRIC_NAV,
+    MESSAGE_STATUS,
+    MESSAGE_METRICS,
+    MESSAGE_BROADCAST_CHANNEL,
+    STATUS_ERROR,
+    STATUS_BEGIN,
+    STATUS_END_KO,
+    STATUS_END_OK
 } = require(`${appRootDir.get()}/config.base`)
-const _METRIC_CARDS = 'cards'
-const _METRIC_QUIZ = 'quiz'
-const _METRIC_NAV = 'navigation'
-const _METRICS = [_METRIC_CARDS, _METRIC_QUIZ, _METRIC_NAV]
 /** playwight role (getByRole) */
 const _PW_ROLE_LINK = 'link'
 const _PW_ROLE_BUTTON = 'button'
@@ -52,7 +53,7 @@ const _CLICKABLE = {
             type: _TYPE_MENU,
             /** Tests show that this actions needs more time to dipslay the page */
             tempo: TEMPO_PAGE,
-            metric: _METRIC_NAV
+            metric: METRIC_NAV
         }
     },
     INPUTS: {
@@ -62,7 +63,7 @@ const _CLICKABLE = {
             selector: null,
             type: _TYPE_INPUT,
             tempo: TEMPO_RADIO,
-            metric: _METRIC_QUIZ
+            metric: METRIC_QUIZ
         },
         RADIO: {
             label: 'radio',
@@ -70,7 +71,7 @@ const _CLICKABLE = {
             selector: null,
             type: _TYPE_INPUT,
             tempo: TEMPO_RADIO,
-            metric: _METRIC_QUIZ
+            metric: METRIC_QUIZ
         }
     },
     PAGES: {
@@ -79,27 +80,27 @@ const _CLICKABLE = {
             type: _TYPE_PAGE,
             path: '/client',
             tempo: TEMPO_PAGE,
-            metric: _METRIC_NAV,
+            metric: METRIC_NAV,
         }
     },
     BUTTONS: {
         CARDNEXT: {
             label: 'SUIVANT',
             tempo: TEMPO_CARD_DISPLAY,
-            metric: _METRIC_CARDS,
+            metric: METRIC_CARDS,
             role: _PW_ROLE_BUTTON,
             type: _TYPE_BUTTON
         },
         CARDPREV: {
             label: 'Précédent',
             tempo: TEMPO_CARD_DISPLAY,
-            metric: _METRIC_CARDS,
+            metric: METRIC_CARDS,
             role: _PW_ROLE_BUTTON,
             type: _TYPE_BUTTON
         },
         DEMARRER: {
             label: 'démarrer',
-            metric: _METRIC_NAV,
+            metric: METRIC_NAV,
             role: _PW_ROLE_BUTTON,
             tempo: TEMPO_PAGE,
             type: _TYPE_BUTTON
@@ -119,7 +120,7 @@ const _CLICKABLE = {
         CONNECTION: {
             label: 'Connexion',
             tempo: TEMPO_PAGE,
-            metric: _METRIC_NAV,
+            metric: METRIC_NAV,
             role: _PW_ROLE_BUTTON,
             type: _TYPE_BUTTON
         }
@@ -128,7 +129,7 @@ const _CLICKABLE = {
         MYSESSIONS: {
             label: 'Toutes mes sessions',
             role: _PW_ROLE_LINK,
-            metric: _METRIC_NAV,
+            metric: METRIC_NAV,
             tempo: TEMPO_PAGE,
             type: _TYPE_TEXT_LINK
         }
@@ -138,13 +139,19 @@ const _CLICKABLE = {
         LIST: {
             /** dynamic */
             label: null,
-            metric: _METRIC_NAV,
+            metric: METRIC_NAV,
             tempo: TEMPO_LIST_DETAIL_SESSION,
             type: _TYPE_LIST_ITEM
         }
 
     }
 }
+
+/**
+ * BroadcastChannel used to send messages to main tread (ScriptsController)
+ * The only way to use the BroadcastChannel with artillery is declare it there (not in the cass)
+ */
+const _broadCastChannel = new BroadcastChannel(MESSAGE_BROADCAST_CHANNEL)
 module.exports = class ScriptRunner extends Runnable {
     stepIdx = 0
     config = null
@@ -153,8 +160,11 @@ module.exports = class ScriptRunner extends Runnable {
     scenario = null
     errorIdx = 0
     metrics = null
-    csvStream = null
     constructor(opts) {
+        opts = Object.assign({
+            scriptFilePath: null,
+            pwPage: null
+        }, opts ?? {})
         super(opts)
         assert(!_.isEmpty(this.scriptFilePath), 'Unexpected empty scriptFilePath')
         assert(!_.isNil(this.pwPage), 'Unexpected empty pwPage')
@@ -162,6 +172,9 @@ module.exports = class ScriptRunner extends Runnable {
         this.config = initConfig(this.className.toLowerCase())
         this.scenario = this.config.scenario ?? {}
         this.learnerName = this.config.getLearnerName()
+        const learnerIdx = (this.learnerName.match(/\.([0-9]+$)/) ?? [])[1]
+        assert(!_.isEmpty(learnerIdx), `unexpected learner name [${this.learnerName}] - Does not match /\.([0-9]+$)/`)
+        this.leanerShortName = `learner${learnerIdx}`
         this.learnerRole = this.config?.entities?.learner?.role ?? 'empty'
         /** see https://playwright.dev/docs/api/class-page#page-set-default-navigation-timeout  */
         this.pwPage.setDefaultNavigationTimeout(this.config.timeouts.defaultNavigationTimeout ?? 1000)
@@ -170,25 +183,6 @@ module.exports = class ScriptRunner extends Runnable {
     }
     /** overriden */
     async asyncInit() {
-        /** Metric */
-        if (process.env.SLDX_METRICS_ENABLED == 'true') {
-            this.metrics = {
-                lastUpdate: null,
-                stats: {}
-            }
-            for (const metricId of _METRICS) {
-                this.metrics.stats[metricId] = Stats()
-            }
-            this.loghighlight(`Metrics are enabled [${_METRICS.join(',')}]`)
-            this.csvStream = new CSVStream({
-                headers: true,
-                override: true,
-                filePath: path.resolve(process.env.SLDX_METRICS_DIR_PATH, `${this.threadId}-metrics.csv`),
-                writeProperties: ['value', 'n', 'min', 'max', 'mean', 'variance', 'label']
-            })
-        } else {
-            this.loghighlight(`Metrics are disabled (SLDX_METRICS_ENABLED!=true)`)
-        }
     }
     get pwPage() {
         return this.opts.pwPage
@@ -196,8 +190,29 @@ module.exports = class ScriptRunner extends Runnable {
     get scriptFilePath() {
         return this.opts.scriptFilePath
     }
+    canSendMessage(data) {
+        if (isMainThread || _.isNil(_broadCastChannel) || _.isEmpty(data)) return false
+        if (data.type == MESSAGE_METRICS && this.config.metrics.sendToMainThread !== true) return false
+        return true
+    }
+    async sendMessage(type, id, data) {
+        data ??= {}
+        data.learner = this.leanerShortName
+        const messagedata = {
+            type: type,
+            id: id,
+            emitter: this.threadId,
+            data: data ?? {}
+        }
+        _verbose && this.log(`sendMessage: ${JSON.stringify(messagedata, null, 2)}`)
+        if (this.canSendMessage(messagedata)) {
+            _broadCastChannel.postMessage(messagedata)
+        }
+        await pause(100)
+        return messagedata
+    }
     geLogName(method) {
-        return this.learnerName
+        return this.leanerShortName
     }
     isPlayWright() {
         return this.config.exec === 'playwright'
@@ -253,50 +268,22 @@ module.exports = class ScriptRunner extends Runnable {
             this.logerror('A non-fatal error occured', new Error(message))
         }
     }
-    getStat(id) {
-        return this.metrics.stats[id]
-    }
-    async sendMetrics(stats, clickInfo, value) {
+    async sendMetrics(clickInfo, duration) {
         try {
-            if (!this.metrics || stats.n <= 0 || !this.csvStream) {
-                return
-            }
-            const data = {
-                type: 'METRICS',
-                id: clickInfo.metric,
-                emitter: this.threadId,
-                data: {
-                    value: value,
-                    n: stats.n,
-                    min: stats.min,
-                    max: stats.max,
-                    mean: Math.floor(stats.mean),
-                    variance: Math.floor(stats.variance),
-                    label: `${clickInfo.type}.${clickInfo.label}`
-                }
-            }
-            _verbose && this.log(`sendMetrics: ${JSON.stringify(data, null, 2)}`)
-            if (!isMainThread && _sendToMainThread) {
-                _workerParentPort.postMessage(data)
-            }
-            this.csvStream.write(data.emitter, data.id, data.data)
+            const data = await this.sendMessage(MESSAGE_METRICS, clickInfo.metric, {
+                duration: duration,
+                label: `${clickInfo.type}.${clickInfo.label}`
+            })
         } catch (e) {
             this.logerror('Error Sending metrics', e)
         }
     }
     async updateMetric(clickInfo, elapsedMs) {
         const metricId = clickInfo.metric
-        if (!this.metrics || !metricId) {
+        if (_.isEmpty(metricId)) {
             return
         }
-        const stats = this.getStat(metricId)
-        if (!stats) {
-            this.logwarning(`Metric id[${metricId}] not found`)
-            return
-        }
-        stats.update(elapsedMs)
-        this.log(`updateMetric.${clickInfo.type}.${metricId} label[${clickInfo.label}] elapsedMs[${elapsedMs}] count[${stats.n}] min[${stats.min}] max[${stats.max}] mean[${Math.floor(stats.mean)}] `)
-        await this.sendMetrics(stats, clickInfo, elapsedMs)
+        await this.sendMetrics(clickInfo, elapsedMs)
     }
     /**
      * Calls callbackMethod
@@ -394,17 +381,17 @@ module.exports = class ScriptRunner extends Runnable {
             return (innerHtml ?? '').trim()
         }
         let buttonText
-        let nbRetry = 2
+        let nbRetries = this.config.misc.readDomNbRetries
         do {
             buttonText = await _tryReadStartButton()
             if (_.isEmpty(buttonText)) {
-                nbRetry--
-                this.logwarning(`Can't read '${expectedText}' button - retry[${nbRetry}] retryPause[${this.config.tempo[TEMPO_RETRY_READ_DOM]}]`)
+                nbRetries--
+                this.logwarning(`Can't read '${expectedText}' button - nbRetries[${nbRetries}] retryPause[${this.config.tempo[TEMPO_RETRY_READ_DOM]}]`)
                 await this.tempo(TEMPO_RETRY_READ_DOM)
             }
-        } while (_.isEmpty(buttonText) && nbRetry > 0)
+        } while (_.isEmpty(buttonText) && nbRetries > 0)
         if (_.isEmpty(buttonText) || buttonText.toLowerCase() != expectedText) {
-            await this.throwError(`User[${this.learnerName}] - Career starts from an unknownn page - ExpectedButton[${expectedText}] GotButton[${buttonText}]`)
+            await this.throwError(`Career starts from an unknownn page - Expected[${expectedText}] Got[${buttonText}] nbRetries[${nbRetries}]`)
         }
         await this.clickByRole(_CLICKABLE.BUTTONS.DEMARRER, tempo)
     }
@@ -495,25 +482,29 @@ module.exports = class ScriptRunner extends Runnable {
         this.log(`gotoPage ${url}`)
         await this.applyAndMesure(pageInfo, tempo, this.pwPage, this.pwPage.goto, url)
     }
-    async runError(e, ...args) {
+    async runBefore(method, ...args) {
+        const traceEnv = []
+        for (const [key, value] of Object.entries(process.env)) {
+            (key == 'LOCAL_WORKER_ID' || key.startsWith('SLDX')) && traceEnv.push(`${key}=${value}`)
+        }
+        this.log(`SLDX Variables:\n${traceEnv.sort().join('\n')}\n`)
+        await this.sendMessage(MESSAGE_STATUS, STATUS_BEGIN)
+    }
+    async runError(method, e, ...args) {
+        await this.sendMessage(MESSAGE_STATUS, STATUS_ERROR, {
+            message: e.message ?? 'no message'
+        })
         throw (e)
     }
+    async runFinally(method, ok, ...args) {
+        await this.sendMessage(MESSAGE_STATUS, ok ? STATUS_END_KO : STATUS_END_KO)
+    }
     async runStart() {
-        try {
-            const traceEnv = []
-            for (const [key, value] of Object.entries(process.env)) {
-                (key == 'LOCAL_WORKER_ID' || key.startsWith('SLDX')) && traceEnv.push(`${key}=${value}`)
-            }
-            this.log(`BEGIN RUN ${this.name}`)
-            this.log(`SLDX Variables:\n${traceEnv.sort().join('\n')}\n`)
-            await this.beforeLogin()
-            await this.login()
-            await this.afterLogin()
-            await this.beforeScriptEnd()
-        } finally {
-            this.log(`END RUN ${this.name}`)
-            this.csvStream && this.csvStream.destroy()
-        }
+        await this.beforeLogin()
+        await this.login()
+        await this.afterLogin()
+        await this.beforeScriptEnd()
+        await this.sendMessage(MESSAGE_STATUS, STATUS_END_OK)
     }
     async login(tempo) {
         this.loghighlight(`login ${this.learnerName}/${this.config.getUserPwd()} [${this.learnerRole}]`)
@@ -558,7 +549,7 @@ module.exports = class ScriptRunner extends Runnable {
     async beforeScriptEnd() {
         await pause(1000);
     }
-    static async factoryRun(scriptFilePath, pwPage) {
+    static async factoryRun(scriptFilePath, pwPage, myConsole) {
         if (_.isEmpty(process.env.SLDX_RUNNER_EXEC)) {
             this.logwarning(`\n\nProcess must be launched by the runner\n- npm run artillery.script1 --  --sldxenv=playwright.debug\n- npm run playwright.script1 --  --sldxenv=playwright.debug --sldxpwuser=user4 --debug\n\n`)
             throw new Error(`Process must be launched by the runner`)
@@ -566,7 +557,8 @@ module.exports = class ScriptRunner extends Runnable {
         await Runnable.factoryRun.apply(this, [{
             name: this.name.toLocaleLowerCase(),
             scriptFilePath: scriptFilePath,
-            pwPage: pwPage
+            pwPage: pwPage,
+            myConsole: myConsole
         }])
     }
     static scriptTimeout() {

@@ -1,76 +1,22 @@
 'use strict';
-
-const myConsole = require('#commons/myConsole')
 const _ = require('lodash')
 const assert = require('assert')
+const Loggable = require('./Loggable')
 
 
-module.exports = class Runnable {
-    #opts = null
-    #myConsole = null
-    constructor(opts) {
-        this.#myConsole = myConsole
-        this.#opts = Object.assign({
-            name: this.className
-        }, opts ?? {})
-        this.loghighlight(`NEW ${this.className} name[${this.name}]`)
-    }
-    async asyncInit() {
-
-    }
-    get className() {
-        return this.constructor.name
-    }
-    get name() {
-        return this.#opts.name
-    }
-    get opts() {
-        return this.#opts
-    }
-    get myConsole() {
-        return this.#myConsole
-    }
-    get threadId(){
-        return this.myConsole.threadId
-    }
-    geLogName(method){
+module.exports = class Runnable extends Loggable {
+    geLogName(method) {
         return method.name
     }
-    /**
-     * Not in console - only in file logger
-     * @param  {...any} args
-     */
-    logFile(...args) {
-        this.myConsole.loggerDebug.apply(this.myConsole, args)
-    }
-    /**
-     * log* methods below log in console and file 
-     */
-    log(...args) {
-        this.loglowlight.apply(this, args)
-    }
-    loglowlight(...args) {
-        this.myConsole.lowlight.apply(this.myConsole, args)
-    }
-    loghighlight(...args) {
-        this.myConsole.highlight.apply(this.myConsole, args)
-    }
-    logsuperhighlight(...args) {
-        this.myConsole.superhighlight.apply(this.myConsole, args)
-    }
-    logerror(...args) {
-        this.myConsole.error.apply(this.myConsole, args)
-    }
-    logwarning(...args) {
-        this.myConsole.warning.apply(this.myConsole, args)
-    }
-    async runBefore(...args) {
+    async runBefore(method, ...args) {
     }
     async runStart(...args) {
     }
-    async runAfter(...args) {
+    async runAfter(method, ...args) {
     }
-    async runError(e, ...args) {
+    async runError(method, e, ...args) {
+    }
+    async runFinally(method, ok, ...args) {
     }
     async run(...args) {
         return this.runMethod.apply(this, [this.runStart, ...args])
@@ -78,22 +24,22 @@ module.exports = class Runnable {
     async runMethod(method, ...args) {
         assert(_.isEmpty(method), `method [${method?.name ?? 'noName'}] not found`)
         const logName = this.geLogName(method)
+        let error = null
         try {
-            this.myConsole.initLoggerFromModule(logName)
-            this.logsuperhighlight(`Begin ${logName}`)
-            await this.runBefore.apply(this, args)
+            this.logsuperhighlight(`RunMethod begin logName$[${logName}]`)
+            this.initFileLogegr(logName)
+            await this.runBefore.apply(this, [method, ...args])
             await method.apply(this, args)
-            await this.runAfter.apply(this, args)
-            this.logsuperhighlight(`End ${logName}`)
+            await this.runAfter.apply(this, [method, ...args])
         } catch (e) {
-            this.logerror(`${logName} FAILED`, e)
-            await this.runError.apply(this, [e, ...args])
+            this.logerror(`RunMethod Error logName$[${logName}]`, e)
+            error = e
+            await this.runError.apply(this, [method, e, ...args])
+        } finally {
+            const ok = (error == null)
+            this.logsuperhighlight(`RunMethod end ${ok ? 'OK' : 'KO'} logName$[${logName}]`)
+            await this.runFinally.apply(this, [method, ok, ...args])
         }
-    }
-    static async factory(opts) {
-        const runnable = new this(opts)
-        await runnable.asyncInit()
-        return runnable
     }
     static async factoryRun(opts, ...args) {
         const runnable = await this.factory.apply(this, [opts, ...args])

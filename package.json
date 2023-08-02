@@ -12,6 +12,7 @@
     "list": "node ./scripts/commands.list",
     "items": "node ./scripts/command.items.js",
     "display.vars.debug": "node runner.node.js displayvars.js --sldxenv=debug",
+    "artillery.test.workers": "node runner.artillery.js test-workers.yml",
     "artillery.test.vusers": "node runner.artillery.js test-vusers.yml",
     "artillery.script1.local": "node runner.artillery.js script1-local.yml",
     "artillery.script1.local.debug": "node runner.artillery.js script1-local-debug.yml --sldxenv=debug",

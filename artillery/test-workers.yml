@@ -1,0 +1,16 @@
+config:
+  target: http://localhost:2020/
+  phases:
+    - name: Warm up phase
+      duration: 1
+      maxVusers: 3
+      arrivalRate: 3
+  engines:
+    playwright: {}
+  processor: "./tests-artillery.js"
+before:
+  flow:
+     - function: mainWorkerThread
+scenarios:
+  - engine: playwright
+    testFunction: "testWorkers"

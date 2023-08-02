@@ -125,6 +125,7 @@ const _Console = function () {
      * @param {string} import_meta provided by import.meta js file for esm ou __filename for commonjs
      */
     this.initLoggerFromModule = (import_meta, opts) => {
+        import_meta ??= 'noname'
         /** 
          * with esm  initLoggerFromModule(import.meta)
          *      import  { filename as filenameEsm } from 'dirname-filename-esm'

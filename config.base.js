@@ -21,6 +21,19 @@ exports.TEMPO_SCREENSHOT = 'secreenShot'
 exports.TEMPO_LOGIN = 'login'
 exports.TEMPO_RETRY_READ_DOM = 'retryReadDom'
 
+exports.METRIC_CARDS = 'cards'
+exports.METRIC_QUIZ = 'quiz'
+exports.METRIC_NAV = 'navigation'
+exports.METRICS = [exports.METRIC_CARDS, exports.METRIC_QUIZ, exports.METRIC_NAV]
+
+exports.STATUS_ERROR = 'error'
+exports.STATUS_BEGIN = 'begin'
+exports.STATUS_END_OK = 'endok'
+exports.STATUS_END_KO = 'endko'
+
+exports.MESSAGE_BROADCAST_CHANNEL = 'MAIN'
+exports.MESSAGE_STATUS = 'STATUS'
+exports.MESSAGE_METRICS = 'METRICS'
 
 
 
@@ -56,6 +69,9 @@ const _baseConfig = {
     exec: process.env.SLDX_RUNNER_EXEC,
     proxyUrl: process.env.SLDX_PROXY_URL,
     ssoUrl: process.env.SLDX_SSO_URL,
+    metrics:{
+        sendToMainThread: true
+    },
     entities: {
         admin: {
             name: process.env.SLDX_ADMIN_NAME,
@@ -95,8 +111,12 @@ const _baseConfig = {
         port: process.env.SLDX_MONGO_PORT,
         url: process.env.SLDX_MONGO_URL
     },
+    misc: {
+        /** nb retries after read dom failed (pause tempo.retryReadDom + readDomNbRetries) */
+        readDomNbRetries: 5
+    },
     tempo: {
-        retryReadDom: 3000,
+        retryReadDom: 5000,
         listDetailSession: 3000,
         login: 2000,
         secreenShot: 5000,
