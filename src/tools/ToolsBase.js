@@ -2,6 +2,7 @@
 
 const prompts = require('prompts')
 const _ = require('lodash')
+const chalk = require('chalk')
 const parseArguments = require('minimist')
 const appRootDir = require('app-root-dir')
 const Runnable = require('#helpers/Runnable')
@@ -59,7 +60,7 @@ module.exports = class ToolsBase extends Runnable {
         const reponse = await prompts({
             type: 'select',
             name: 'value',
-            message: 'Pick an acion',
+            message: `Pick an acion ${chalk.yellow(`dryrun=${this.dryrun}`)}`,
             choices: actionChoices,
             initial: null
         })

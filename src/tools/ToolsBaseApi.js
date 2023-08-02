@@ -269,7 +269,7 @@ module.exports = class ToolsBaseApi extends ToolsBase {
     }
     async profiles(displayResult = false) {
         /** !! sorted by name testperfs.leaner.idx - Important because the user names is retreived by the worker index in artillery test */
-        const data = await this.getSsoCollection('/Profile/*/10000/$limit',  _sortProfiles)
+        const data = await this.getSsoCollection('/Profile/*/10000/$limit', _sortProfiles)
         displayResult === true && this.displayCollection(data, { property: 'name', nbRecords: 200 })
         return data
     }
@@ -323,7 +323,7 @@ module.exports = class ToolsBaseApi extends ToolsBase {
         this.loghighlight(`deleteSessionByName [${sessionName}]`)
         assert(!_.isEmpty(sessionName), 'Empty session name')
         const sessions = await this.sessions()
-        const session = sessions.result.find(x => x.title === sessionName)
+        const session = this.dryrun ? { _id: 'fakeid' } : sessions.result.find(x => x.title === sessionName)
         if (session != null) {
             await this.deleteSessionById(session._id)
         } else {
@@ -333,7 +333,7 @@ module.exports = class ToolsBaseApi extends ToolsBase {
     async deleteSessionById(id) {
         this.loghighlight(`deleteSessionById [${id}]`)
         assert(!_.isEmpty(id), 'Empty session id')
-        const result = await this.delete('/server/api/careers-publish-sessions/', id, 'true')
+        const result = await this.delete('/server/api/careers-publish-sessions', id, 'true')
         this.loghighlight(`session id[${id}] deleted`)
     }
     async createTestSession() {
