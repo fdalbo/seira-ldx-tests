@@ -494,14 +494,13 @@ module.exports = class ScriptRunner extends Runnable {
         throw (e)
     }
     async runFinally(method, ok, ...args) {
-        await this.sendMessage(MESSAGE_STATUS, ok ? STATUS_END_KO : STATUS_END_KO)
+        await this.sendMessage(MESSAGE_STATUS, ok ? STATUS_END_OK : STATUS_END_KO)
     }
     async runStart() {
         await this.beforeLogin()
         await this.login()
         await this.afterLogin()
         await this.beforeScriptEnd()
-        await this.sendMessage(MESSAGE_STATUS, STATUS_END_OK)
     }
     async login(tempo) {
         this.loghighlight(`login ${this.learnerName}/${this.config.getUserPwd()} [${this.learnerRole}]`)

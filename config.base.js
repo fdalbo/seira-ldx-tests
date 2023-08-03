@@ -30,6 +30,7 @@ exports.STATUS_ERROR = 'error'
 exports.STATUS_BEGIN = 'begin'
 exports.STATUS_END_OK = 'endok'
 exports.STATUS_END_KO = 'endko'
+exports.STATUS_LIST = [exports.STATUS_ERROR, exports.STATUS_BEGIN, exports.STATUS_END_OK, exports.STATUS_END_KO]
 
 exports.MESSAGE_BROADCAST_CHANNEL = 'MAIN'
 exports.MESSAGE_STATUS = 'STATUS'
@@ -113,7 +114,8 @@ const _baseConfig = {
     },
     misc: {
         /** nb retries after read dom failed (pause tempo.retryReadDom + readDomNbRetries) */
-        readDomNbRetries: 5
+        readDomNbRetries: 5,
+        refreshSummaryPeriod: 2000
     },
     tempo: {
         retryReadDom: 5000,
@@ -128,8 +130,8 @@ const _baseConfig = {
         modal: 2000
     },
     timeouts: {
-        defaultNavigationTimeout: 30 * 1000,
-        defaultTimeout: 30 * 1000
+        defaultNavigationTimeout: 1 * 60 * 1000,
+        defaultTimeout: 1 * 60 * 1000
     },
     artillery: {
         learner: {
@@ -187,6 +189,7 @@ const _initConfig = (scriptId) => {
     _config = deepmerge(_baseConfig, require(configPath))
     _config.scriptId = scriptId
     _config.configPath = configPath
+    _config.fileName = fileNameScript
     myConsole.highlight(`Config Path: [${configPath}]`)
     myConsole.lowlight(`Config:\n${prettyFormat(_config)}\n©`)
     return _config

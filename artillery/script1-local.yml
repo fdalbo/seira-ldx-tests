@@ -3,9 +3,9 @@ config:
   target: http://localhost:2020/
   phases:
     - name: testSeira
-      duration: 50
-      maxVusers: 50
-      arrivalRate: 50
+      duration: 30
+      maxVusers: 30
+      arrivalRate: 30
 
 #--------------------------------------------------------------------------------
 # The following example creates 20 virtual users in 60 seconds (one virtual user approximately every 3 seconds):
@@ -31,7 +31,7 @@ config:
   processor: ./tests-artillery.js
 before:
   flow:
-     - function: initTest
+     - function: testInitScript1
 scenarios:
   - engine: playwright
-    testFunction: script1
+    testFunction: testRunScript1

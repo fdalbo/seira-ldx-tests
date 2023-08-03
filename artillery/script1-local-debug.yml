@@ -7,13 +7,18 @@ config:
   target: http://localhost:2020/
   # debug -> one worker
   # Load the Playwright engine:
+phases:
+  - name: testSeira
+    duration: 1
+    maxVusers: 1
+    arrivalRate: 1
   engines:
     playwright: {}
   # Path to JavaScript file that defines Playwright test functions
-  processor: "./tests-artillery.js"
+  processor: ./tests-artillery.js
 before:
   flow:
-     - function: 'initTest'
+     - function: testInitScript1
 scenarios:
   - engine: playwright
-    testFunction: "script1"
+    testFunction: testRunScript1

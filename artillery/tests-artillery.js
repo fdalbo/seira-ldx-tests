@@ -1,7 +1,7 @@
 /**
  * THIS IS THE JS FILE CALLED BY ARTILLERY (SEE .YML ABOVE)
  */
-module.exports = { script1, testVUsers, initTest, testWorkers };
+module.exports = { testRunScript1, testInitScript1, testVUsers, testWorkers };
 const {
   isMainThread,
   BroadcastChannel,
@@ -34,7 +34,8 @@ if (isMainThread) {
     const ScriptsController = require('#scripts/ScriptsController')
     myConsole.superhighlight(`mainWorkerThread ${myConsole.threadId}`)
     const scriptsController = await ScriptsController.factory({
-      myConsole: myConsole
+      myConsole: myConsole,
+      scriptName: Script1.name.toLowerCase()
     })
   })()
 }
@@ -57,37 +58,37 @@ myConsole.highlight(`ARTILLERY LOAD TEST.JS [${myConsole.threadId}] [${getcpt('S
  * @param {*} pwPage      playwright Page (browser)
  * @param {*} userContext artillery context 
  **************************************************************************************************/
-async function script1(pwPage, userContext, event) {
+async function testRunScript1(pwPage, userContext, event) {
   if (!process.env.SLDX_CPT_RUN) {
     process.env.SLDX_CPT_RUN = '1'
   }
-  myConsole.superhighlight(`ARTILLERY RUN SCRIPT1 THREAD[${myConsole.threadId}] CPT[${getcpt('SLDX_CPT_RUN')}]`)
   if (process.env.SLDX_LOADED == 'true') {
     /**
      * Currently we can't run multiple scripts in the same worker (the way artillery is working)
      * We need to create as many worker as VUsers (set WORKERS=#VUsers before runing artillery)
      * --> see src/_helpers/env/runner.js
      */
-    myConsole.highlight(`ARTILLERY RUN TEST.JS - ALREADY LOADED - SKIP`)
+    myConsole.red(`Artillery run script '${Script1.name}' cpt[${getcpt('SLDX_CPT_RUN')}] - ALREADY LOADED - SKIP`)
     return
   }
   process.env.SLDX_LOADED = 'true'
-  myConsole.highlight(`ARTILLERY RUN TEST.JS`)
+  myConsole.superhighlight(`Artillery run test '${Script1.name}'`)
   await Script1.factoryRun.apply(Script1, [__filename, pwPage, myConsole])
 }
 
 /***************************************************************************************************
- * initTest
+ * testInitScript1, 
  * Called once before launching all tests
  * Reset te backend (delete the learning session and all the trackings)
  **************************************************************************************************/
-async function initTest(userContext, event, done) {
-  myConsole.superhighlight(`ARTILLERY INIT TESTS`)
+async function testInitScript1(userContext, event, done) {
+  const scriptName = Script1.name.toLowerCase()
+  myConsole.superhighlight(`Artillery init test '${Script1.name}'`)
   const api = new ToolsBaseApi({
     dryrun: false,
-    scriptId: Script1.name.toLowerCase()
+    scriptId: scriptName
   })
-  myConsole.initLoggerFromModule('artillery.init.testsinit')
+  myConsole.initLoggerFromModule(`artillery.init.test.${scriptName}`)
   await api.resetTestEnvironment()
   return done()
 }

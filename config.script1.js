@@ -25,14 +25,14 @@ module.exports = {
         mainNbLearners: 1000
     },
     scenario:{
-        nbLoopQuiz1: 100,
-        nbLoopQuiz2: 100,
-        nbLoopQuiz3: 100
+        nbLoopQuiz1: 500,
+        nbLoopQuiz2: 500,
+        nbLoopQuiz3: 500
     },
     tempo: {
         default: 3000,
         page: 3000,
-        radioCheckbox: 1000,
+        radioCheckbox: 500,
         cardDisplay: 3000,
         textInput: 2000,
         modal: 3000
