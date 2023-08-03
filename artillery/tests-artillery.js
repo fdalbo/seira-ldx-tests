@@ -21,7 +21,6 @@ const {
   MESSAGE_METRICS
 } = require(`${appRootDir.get()}/config.base`)
 
-myConsole.initLoggerFromModule(__filename)
 
 if (isMainThread) {
   /**
@@ -88,6 +87,7 @@ async function initTest(userContext, event, done) {
     dryrun: false,
     scriptId: Script1.name.toLowerCase()
   })
+  myConsole.initLoggerFromModule('artillery.init.testsinit')
   await api.resetTestEnvironment()
   return done()
 }

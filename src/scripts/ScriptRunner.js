@@ -158,7 +158,7 @@ module.exports = class ScriptRunner extends Runnable {
     learnerName = null
     learnerRole = null
     scenario = null
-    errorIdx = 0
+    screenShotIdx = 0
     metrics = null
     constructor(opts) {
         opts = Object.assign({
@@ -231,42 +231,38 @@ module.exports = class ScriptRunner extends Runnable {
         return url.pathname.substring(url.pathname.lastIndexOf('/'))
     }
     /**
-     * 
-     * @param {string} selector 
-     * @param {string} filename without extension
+     * Save full page in a .png file
      */
-    async saveScreenShot(selector, filename) {
+    async saveScreenShot(name) {
+        name ?? 'page.screenshot'
+        if (_.isNil(this.pwPage)) {
+            return
+        }
         try {
-            if (this.pwPage) {
-                const ssPath = (idx) => path.resolve(process.env.SLDX_SCREENSHOTS_DIR_PATH, `${this.threadId}${filename}.${idx}.png`)
-                this.loghighlight(`Save screenshot [${ssPath(1)}]`)
-                await this.pwPage.locator(selector).screenshot({
+            const _save = async () => {
+                this.screenShotIdx++
+                const ssPath = path.resolve(process.env.SLDX_SCREENSHOTS_DIR_PATH, `${this.threadId}.${this.leanerShortName}.${name}.${this.screenShotIdx}.png`)
+                this.loghighlight(`Save screenshot [${ssPath}]`)
+                await this.pwPage.screenshot({
                     animations: 'disabled',
                     type: 'png',
-                    path: ssPath(1)
-                })
-                /** Let some time to display the page and to compare the 2 screen shots*/
-                await pause(this.config.tempo[TEMPO_SCREENSHOT])
-                await this.pwPage.locator(selector).screenshot({
-                    animations: 'disabled',
-                    type: 'png',
-                    path: ssPath(2)
+                    path: ssPath
                 })
             }
+            await _save()
+            /** Let some time to display the page and to compare the 2 screen shots*/
+            await pause(this.config.tempo[TEMPO_SCREENSHOT])
+            await _save()
         } catch (e) {
             this.logwarning(`Error saving the screenshot`, e)
         }
     }
-    async throwError(message, throwError = true) {
-        this.errorIdx++
-        await this.saveScreenShot('body', `error_${this.errorIdx++}`)
+    async throwError(message, error) {
         message = `[${this.threadId}] [${this.learnerName ?? 'no learner'}] ${message}`
-        if (throwError == true) {
-            this.logerror('A fatal error occured (see screenshot)', new Error(message))
-            throw new Error(message)
-        } else {
-            this.logerror('A non-fatal error occured', new Error(message))
-        }
+        this.logerror('A fatal error occured (see screenshot)', new Error(message))
+        throw new Error(message, {
+            cause: error
+        })
     }
     async sendMetrics(clickInfo, duration) {
         try {
@@ -494,6 +490,7 @@ module.exports = class ScriptRunner extends Runnable {
         await this.sendMessage(MESSAGE_STATUS, STATUS_ERROR, {
             message: e.message ?? 'no message'
         })
+        await this.saveScreenShot('error')
         throw (e)
     }
     async runFinally(method, ok, ...args) {
