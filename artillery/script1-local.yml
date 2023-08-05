@@ -1,12 +1,18 @@
 #https://www.artillery.io/docs/reference/test-script
 config:
   target: http://localhost:2020/
+  payload:
+    # The VUser context provides the values to the script (usercontext.vars.learnername / usercontext.vars.learnername )
+    path: 5000-learners.csv
+    fields:
+      - learnername
+      - password
+    order: sequence
   phases:
-    - name: testSeira
-      duration: 30
-      maxVusers: 30
-      arrivalRate: 30
-
+    - name: test script1
+      duration: 10
+      maxVusers: 5
+      arrivalRate: 2
 #--------------------------------------------------------------------------------
 # The following example creates 20 virtual users in 60 seconds (one virtual user approximately every 3 seconds):
 #
@@ -35,3 +41,4 @@ before:
 scenarios:
   - engine: playwright
     testFunction: testRunScript1
+

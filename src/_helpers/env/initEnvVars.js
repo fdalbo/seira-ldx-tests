@@ -265,6 +265,7 @@ module.exports.initEnvVars = (additionalEnvVars, options) => {
         fs.ensureDirSync(metricPathVar.value)
         calculated.push(metricPathVar)
     }
+
     /** Update  process.env */
     calculated.forEach(v => process.env[v.name] = v.value ?? '')
 

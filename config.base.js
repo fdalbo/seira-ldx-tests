@@ -23,9 +23,22 @@ exports.TEMPO_RETRY_READ_DOM = 'retryReadDom'
 
 exports.METRIC_CARDS = 'cards'
 exports.METRIC_QUIZ = 'quiz'
-exports.METRIC_NAV = 'navigation'
-exports.METRICS = [exports.METRIC_CARDS, exports.METRIC_QUIZ, exports.METRIC_NAV]
-
+exports.METRIC_LEARNER_HOME = 'learnerhome'
+exports.METRIC_START_CAREER = 'startcareer'
+exports.METRIC_LOGIN = 'login'
+exports.METRIC_FIRST_PAGE = 'firstpage'
+exports.METRIC_LEARNER_SESSIONS = 'sessionslist'
+exports.METRIC_LEARNER_SESSION = 'sessionhome'
+exports.METRICS = [
+    exports.METRIC_CARDS,
+    exports.METRIC_QUIZ,
+    exports.METRIC_LEARNER_HOME,
+    exports.METRIC_START_CAREER,
+    exports.METRIC_LOGIN,
+    exports.METRIC_FIRST_PAGE,
+    exports.METRIC_LEARNER_SESSIONS,
+    exports.METRIC_LEARNER_SESSION
+]
 exports.STATUS_ERROR = 'error'
 exports.STATUS_BEGIN = 'begin'
 exports.STATUS_END_OK = 'endok'
@@ -36,41 +49,31 @@ exports.MESSAGE_BROADCAST_CHANNEL = 'MAIN'
 exports.MESSAGE_STATUS = 'STATUS'
 exports.MESSAGE_METRICS = 'METRICS'
 
-
-
-const _getArtilleryLearnerName = () => {
-    const workerIdx = parseInt(process.env.LOCAL_WORKER_ID ?? '')
-    if (isNaN(workerIdx)) {
-        throw new Error(`Running artillery - Unexpected empty 'LOCAL_WORKER_ID' env variable`)
-    }
-    const userPrefix = process.env.SLDX_LEARNER_PREFIX
-    if (userPrefix.length == 0) {
-        throw new Error(`Running artillery - Unexpected empty 'SLDX_LEARNER_PREFIX' env variable`)
-    }
-    /**
-     * userPrefix1, 2, 3....
-     */
-    const userFirstIdx = workerIdx + parseInt(process.env.SLDX_ARTILLERY_USER_FIRST_IDX ?? '0')
-    if (isNaN(userFirstIdx)) {
-        throw new Error(`Running artillery - Unexpected empty 'SLDX_ARTILLERY_USER_FIRST_IDX' env variable`)
-    }
-    return `${userPrefix}${userFirstIdx}`
-}
-const _getPlaywrightLearnerName = () => {
-    const name = process.env.SLDX_PLAYWRIGHT_LEARNER_NAME
-    if (name.length == 0) {
-        throw new Error(`Running playwright - Unexpected empty 'SLDX_PLAYWRIGHT_LEARNER_NAME' env variable`)
-    }
-    return name
+module.exports.getLearnerShortName = (leanerName) => {
+    const learnerIdx = (leanerName.match(/\.([0-9]+$)/) ?? [])[1]
+    assert(!_.isEmpty(learnerIdx), `unexpected learner name [${leanerName}] - Does not match /\\.([0-9]+$)/`)
+    return `learn${learnerIdx}`
 }
 
 let _config = null
+/**
+ * Base config is merged with the scenario's config (see _initConfig below)
+ * Eg: If the script class name is 'Script1' 
+ *     If process.SLDX_ENV == '' 
+ *     - The config file's name is 'config.script1.js'
+ *     - The script config is given by merging _baseConfig with config.script1.js
+ *     If process.SLDX_ENV == 'debug' 
+ *     - The config file's name is 'config.debug.script1.js'
+ *     The script config is given by merging _baseConfig with the file above
+ */
 const _baseConfig = {
     /** artillery / playwright */
     exec: process.env.SLDX_RUNNER_EXEC,
     proxyUrl: process.env.SLDX_PROXY_URL,
+    /** used by login (see ToolBaseApi) */
     ssoUrl: process.env.SLDX_SSO_URL,
-    metrics:{
+    metrics: {
+        /** Display metrics true/false */
         sendToMainThread: true
     },
     entities: {
@@ -80,8 +83,10 @@ const _baseConfig = {
             role: exports.ROLE_ADMIN
         },
         learner: {
-            /** many learners testperfs.learner.1, .2 ... */
-            id: null,
+            /** !! overriden by artillery (see artillery/tests-artillery.js) */
+            name: process.env.SLDX_LEARNER_NAME,
+            shortName: process.env.SLDX_LEARNER_SHORTNAME,
+            /** Used by DB tools */
             prefix: process.env.SLDX_LEARNER_PREFIX,
             password: process.env.SLDX_LEARNER_PWD,
             encryptedPwd: process.env.SLDX_LEARNER_ENCRYPTED_PWD,
@@ -93,18 +98,22 @@ const _baseConfig = {
             role: exports.ROLE_TEACHER
         },
         group: {
+            /** Used by DB tools */
             prefix: process.env.SLDX_GROUP_PREFIX
         },
         session: {
+            /** Used by DB tools */
             prefix: process.env.SLDX_SESSION_PREFIX,
             mainName: `${process.env.SLDX_SESSION_PREFIX}main`,
             mainNbLearners: 100
         },
         career: {
+            /** Career used by the scenario */
             mainName: `${process.env.SLDX_CAREER_PREFIX}main`,
         }
     },
     apiCli: {
+        /** axios tiemput for http request (see testInitScript / ToolBaseApi) */
         timeout: 1000
     },
     mongo: {
@@ -113,52 +122,51 @@ const _baseConfig = {
         url: process.env.SLDX_MONGO_URL
     },
     misc: {
-        /** nb retries after read dom failed (pause tempo.retryReadDom + readDomNbRetries) */
+        /** nb retries if read dom fails (pause tempo.retryReadDom + readDomNbRetries) */
         readDomNbRetries: 5,
-        refreshSummaryPeriod: 2000
+        /** Display the the monitoring every refreshMonitoringPeriod Ms */
+        refreshMonitoringPeriod: 5000,
+        /** Counts/reports the number of click every timeSlotPeriod Ms*/
+        timeSlotPeriod: 100,
+        /** Click response time
+         * fast:    time < clickResponseTimeOk 
+         * ok:      clickResponseTimeOk < time < clickResponseTimeWarning 
+         * warning: clickResponseTimeWarning < time < clickResponseTimeDanger 
+         * danger:  time > clickResponseTimeDanger 
+         * */
+        clickResponseTimeOk: 1000,
+        clickResponseTimeWarning: 3000,
+        clickResponseTimeDanger: 5000,
     },
     tempo: {
+        /** tempo before retrying if dom read fails */
         retryReadDom: 5000,
+        /** tempo after click on the session list line */
         listDetailSession: 3000,
+        /** tempo after login */
         login: 2000,
+        /** tempo before secreenShot (on error) */
         secreenShot: 5000,
+        /** default tempo */
         default: 2000,
+        /** Tempo on navigation click */
         page: 2000,
+        /** Tempo on radio/checkbo click (quiz) */
         radioCheckbox: 2000,
+        /** Tempo on next/prev card button */
         cardDisplay: 5000,
+        /** Tempo after an input field has been filled */
         textInput: 1000,
+        /** Tempo after displaying a modal and before clicking the ok/cancel button s*/
         modal: 2000
     },
     timeouts: {
+        /** Playwright timeouts (https://playwright.dev/docs/api/class-page#page-set-default-navigation-timeout) */
         defaultNavigationTimeout: 1 * 60 * 1000,
         defaultTimeout: 1 * 60 * 1000
     },
-    artillery: {
-        learner: {
-            name: _getArtilleryLearnerName,
-            password: process.env.SLDX_LEARNER_PWD ?? ''
-        },
-    },
-    playwright: {
-        learner: {
-            name: _getPlaywrightLearnerName,
-            password: process.env.SLDX_LEARNER_PWD ?? ''
-        },
-    },
-    scenario: null,
-    getLearnerName: (...args) => {
-        let learnerName = _config[process.env.SLDX_RUNNER_EXEC]?.learner.name ?? ''
-        if (typeof learnerName == 'function') learnerName = learnerName.apply(this, args)
-        learnerName = learnerName.toString().trim()
-        if (learnerName.length == 0) {
-            throw new Error(`Unexpected empty learner.name`)
-        }
-        myConsole.highlight(`learner[${learnerName}]`)
-        return learnerName
-    },
-    getUserPwd: () => {
-        return _config[process.env.SLDX_RUNNER_EXEC]?.learner?.password ?? ''
-    }
+    /** Scenario data (see script 1) */
+    scenario: null
 }
 const _initConfig = (scriptId) => {
     assert(!_.isNil(scriptId), 'Unexpected empty scriptId. Can\'t read config file')
@@ -183,19 +191,16 @@ const _initConfig = (scriptId) => {
         }
     }
     const configPath = path.resolve(appRootDir.get(), fileNameScript)
-    if (!fs.existsSync(configPath)) {
-        throw new Error(`Script [${scriptId}] - Config file not found\n- [${configPath}]`)
-    }
+    assert(fs.existsSync(configPath), `Script [${scriptId}] - Config file not found\n- [${configPath}]`)
+    /** Merge */
     _config = deepmerge(_baseConfig, require(configPath))
     _config.scriptId = scriptId
     _config.configPath = configPath
     _config.fileName = fileNameScript
+    assert(_.isEmpty(_config.leaner), `Script [${scriptId}] - Unexpected empty config.leaner`)
     myConsole.highlight(`Config Path: [${configPath}]`)
     myConsole.lowlight(`Config:\n${prettyFormat(_config)}\n©`)
     return _config
 }
 
-
-module.exports.getArtilleryUserName = _getArtilleryLearnerName
-module.exports.getPlaywrightUserName = _getPlaywrightLearnerName
 module.exports.initConfig = _initConfig

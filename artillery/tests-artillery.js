@@ -6,39 +6,26 @@ const {
   isMainThread,
   BroadcastChannel,
   threadId
-} = require('worker_threads')
+} = require('worker_threads');
 const Script1 = require('#scripts/Script1')
 const myConsole = require('#commons/myConsole')
-const { pause } = require('#commons/promises')
 const ToolsBaseApi = require('#tools/ToolsBaseApi')
 const appRootDir = require('app-root-dir')
+const _ = require('lodash')
+const assert = require('assert')
+// eslint-disable-next-line no-unused-vars
+const { format: prettyFormat } = require('pretty-format')
 const {
   METRIC_CARDS,
   METRIC_QUIZ,
   METRIC_NAV,
   MESSAGE_STATUS,
   MESSAGE_BROADCAST_CHANNEL,
-  MESSAGE_METRICS
+  MESSAGE_METRICS,
+  getLearnerShortName
 } = require(`${appRootDir.get()}/config.base`)
 
 
-if (isMainThread) {
-  /**
-   * Main process 
-   * We can open a listener on the BroadcastChannel to receive messages from the workers
-   * - It's a workaround because we do'nt hace acces to the worker (doen by artillery)
-   * - It's needed to control the execution and store our metrics 
-   * - Artillery metrics are very poor with playwright because we stay always on the same page (perhaps there's a way to measure chromium httprequests)
-   */
-  (async () => {
-    const ScriptsController = require('#scripts/ScriptsController')
-    myConsole.superhighlight(`mainWorkerThread ${myConsole.threadId}`)
-    const scriptsController = await ScriptsController.factory({
-      myConsole: myConsole,
-      scriptName: Script1.name.toLowerCase()
-    })
-  })()
-}
 
 /** To control the number of scripts per workers (only one) */
 const getcpt = (cpt) => {
@@ -52,17 +39,31 @@ if (!process.env.SLDX_CPT_LOAD) {
 }
 myConsole.highlight(`ARTILLERY LOAD TEST.JS [${myConsole.threadId}] [${getcpt('SLDX_CPT_LOAD')}]`)
 
+/** 
+ * We've on console per worker or main thread
+ * ScriptMonitoring and testInitScript1 log in main thread log file
+ * It's artillery that manages the dispatching of the tests' execution into the threads
+ */
+myConsole.initLoggerFromModule(`artillery.test`)
+
 /**************************************************************************************************
  * RUN 'Script1' with playwright engine
- * !!! initTest must be called before (see .yml before\n flow\n  -funcion: initTest\n)
+ * !!! testRunScript1 must be called before launching this test (see .yml before\n flow\n  -funcion: initTest\n)
+ * --> Initialization of seiradb
  * @param {*} pwPage      playwright Page (browser)
  * @param {*} userContext artillery context 
  **************************************************************************************************/
 async function testRunScript1(pwPage, userContext, event) {
+  assert(!_.isEmpty(userContext.vars.learnername), 'Unexpected empty userContext.vars.learnername - Check yml file - payload/path/fieldslearnername must provide the learner name')
+  /** Set SLDX_LEARNER_NAME with the value given by artillery through the .csv file */
+  process.env.SLDX_LEARNER_NAME = userContext.vars.learnername
+  process.env.SLDX_LEARNER_SHORTNAME = getLearnerShortName(process.env.SLDX_LEARNER_NAME)
+  /** userContext.vars.password not used - same password SLDX_LEARNER_PWD for all leaners */
   if (!process.env.SLDX_CPT_RUN) {
     process.env.SLDX_CPT_RUN = '1'
   }
-  if (process.env.SLDX_LOADED == 'true') {
+  // eslint-disable-next-line no-constant-condition
+  if (false && process.env.SLDX_LOADED == 'true') {
     /**
      * Currently we can't run multiple scripts in the same worker (the way artillery is working)
      * We need to create as many worker as VUsers (set WORKERS=#VUsers before runing artillery)
@@ -72,7 +73,7 @@ async function testRunScript1(pwPage, userContext, event) {
     return
   }
   process.env.SLDX_LOADED = 'true'
-  myConsole.superhighlight(`Artillery run test '${Script1.name}'`)
+  myConsole.superhighlight(`Artillery run test '${Script1.name}' username[${userContext.vars.learnername}] password[${userContext.vars.password}]`)
   await Script1.factoryRun.apply(Script1, [__filename, pwPage, myConsole])
 }
 
@@ -83,12 +84,30 @@ async function testRunScript1(pwPage, userContext, event) {
  **************************************************************************************************/
 async function testInitScript1(userContext, event, done) {
   const scriptName = Script1.name.toLowerCase()
-  myConsole.superhighlight(`Artillery init test '${Script1.name}'`)
+  myConsole.superhighlight(`Artillery init test '${scriptName}'`)
+  /**
+   * Init Script si launched by artilery in main thread 
+   */
+  assert(isMainThread, `Unexpected thread Expected[MAIN] Got[${threadId}]`)
+  /**
+   * MAIN PROCESS 
+   * We can open a listener on the BroadcastChannel to receive the messages from the workers
+   * - It's a workaround because we do'nt hace acces to the worker (doen by artillery)
+   * - It's needed to control the execution and store our metrics 
+   * - Artillery metrics are very poor with playwright because we stay always on the same page (perhaps there's a way to measure chromium httprequests)
+   */
+  const ScriptMonitoring = require('#scripts/ScriptMonitoring')
+  await ScriptMonitoring.factory({
+    myConsole: myConsole,
+    scriptName: Script1.name.toLowerCase()
+  })
+  /**
+   * Init seira DB
+   */
   const api = new ToolsBaseApi({
     dryrun: false,
     scriptId: scriptName
   })
-  myConsole.initLoggerFromModule(`artillery.init.test.${scriptName}`)
   await api.resetTestEnvironment()
   return done()
 }
@@ -98,11 +117,19 @@ async function testInitScript1(userContext, event, done) {
  * - !! multiple vusers can be launched by artillery in the same worker (it was not expected)
  * - we've to change the way the script is running in order to be able tp launch multiple scripts in the same worker
  **************************************************************************************************/
-async function testVUsers() {
+async function testVUsers(pwPage, userContext) {
   if (!process.env.SLDX_CPT_RUN) {
     process.env.SLDX_CPT_RUN = '1'
   }
-  myConsole.superhighlight(`ARTILLERY RUN testVUsers THREAD[${myConsole.threadId}] CPT[${getcpt('SLDX_CPT_RUN')}]`)
+  myConsole.superhighlight(`ARTILLERY RUN testVUsers CPT[${getcpt('SLDX_CPT_RUN')}] username[${userContext.vars.learnername}] password[${userContext.vars.password}]`)
+
+  return new Promise((resolve) => {
+    const cpt = getcpt('SLDX_CPT_RUN')
+    setTimeout(() => {
+      myConsole.highlight(`END ${cpt}`)
+      resolve()
+    }, 60 * 1000)
+  })
 }
 
 /***************************************************************************************************
@@ -123,8 +150,8 @@ async function testWorkers() {
     let threadNum = parseInt(threadId)
     /**
      * broadCastChannel used by scripts to send message and by main thread to receive /Process them
-     * see ScriptsController and ScriptRunner
-     * ScriptsController below create a listener on this channel
+     * see ScriptMonitoring and ScriptRunner
+     * ScriptMonitoring below create a listener on this channel
      */
     const broadCastChannel = new BroadcastChannel(MESSAGE_BROADCAST_CHANNEL);
     setInterval(async () => {

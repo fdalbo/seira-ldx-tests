@@ -25,7 +25,12 @@ const {
     TEMPO_RETRY_READ_DOM,
     METRIC_CARDS,
     METRIC_QUIZ,
-    METRIC_NAV,
+    METRIC_LEARNER_HOME,
+    METRIC_START_CAREER,
+    METRIC_LOGIN,
+    METRIC_FIRST_PAGE,
+    METRIC_LEARNER_SESSIONS,
+    METRIC_LEARNER_SESSION,
     MESSAGE_STATUS,
     MESSAGE_METRICS,
     MESSAGE_BROADCAST_CHANNEL,
@@ -53,7 +58,7 @@ const _CLICKABLE = {
             type: _TYPE_MENU,
             /** Tests show that this actions needs more time to dipslay the page */
             tempo: TEMPO_PAGE,
-            metric: METRIC_NAV
+            metric: METRIC_LEARNER_HOME
         }
     },
     INPUTS: {
@@ -80,7 +85,7 @@ const _CLICKABLE = {
             type: _TYPE_PAGE,
             path: '/client',
             tempo: TEMPO_PAGE,
-            metric: METRIC_NAV,
+            metric: METRIC_FIRST_PAGE,
         }
     },
     BUTTONS: {
@@ -100,7 +105,7 @@ const _CLICKABLE = {
         },
         DEMARRER: {
             label: 'démarrer',
-            metric: METRIC_NAV,
+            metric: METRIC_START_CAREER,
             role: _PW_ROLE_BUTTON,
             tempo: TEMPO_PAGE,
             type: _TYPE_BUTTON
@@ -120,7 +125,7 @@ const _CLICKABLE = {
         CONNECTION: {
             label: 'Connexion',
             tempo: TEMPO_PAGE,
-            metric: METRIC_NAV,
+            metric: METRIC_LOGIN,
             role: _PW_ROLE_BUTTON,
             type: _TYPE_BUTTON
         }
@@ -129,7 +134,7 @@ const _CLICKABLE = {
         MYSESSIONS: {
             label: 'Toutes mes sessions',
             role: _PW_ROLE_LINK,
-            metric: METRIC_NAV,
+            metric: METRIC_LEARNER_SESSIONS,
             tempo: TEMPO_PAGE,
             type: _TYPE_TEXT_LINK
         }
@@ -139,7 +144,7 @@ const _CLICKABLE = {
         LIST: {
             /** dynamic */
             label: null,
-            metric: METRIC_NAV,
+            metric: METRIC_LEARNER_SESSION,
             tempo: TEMPO_LIST_DETAIL_SESSION,
             type: _TYPE_LIST_ITEM
         }
@@ -148,34 +153,27 @@ const _CLICKABLE = {
 }
 
 /**
- * BroadcastChannel used to send messages to main tread (ScriptsController)
+ * BroadcastChannel used to send messages to main tread (ScriptMonitoring)
  * The only way to use the BroadcastChannel with artillery is declare it there (not in the cass)
  */
 const _broadCastChannel = new BroadcastChannel(MESSAGE_BROADCAST_CHANNEL)
 module.exports = class ScriptRunner extends Runnable {
     stepIdx = 0
-    config = null
-    learnerName = null
-    learnerRole = null
-    scenario = null
     screenShotIdx = 0
     metrics = null
+    startTime  = null
     constructor(opts) {
         opts = Object.assign({
             scriptFilePath: null,
-            pwPage: null
+            pwPage: null,
+            config: null
         }, opts ?? {})
         super(opts)
-        assert(!_.isEmpty(this.scriptFilePath), 'Unexpected empty scriptFilePath')
+        assert(!_.isEmpty(this.config), 'Unexpected empty config')
+        assert(!_.isEmpty(this.opts.scriptFilePath), 'Unexpected empty scriptFilePath')
         assert(!_.isNil(this.pwPage), 'Unexpected empty pwPage')
-        this.loghighlight(`Script runner launched from[${this.scriptFilePath}]`)
-        this.config = initConfig(this.className.toLowerCase())
-        this.scenario = this.config.scenario ?? {}
-        this.learnerName = this.config.getLearnerName()
-        const learnerIdx = (this.learnerName.match(/\.([0-9]+$)/) ?? [])[1]
-        assert(!_.isEmpty(learnerIdx), `unexpected learner name [${this.learnerName}] - Does not match /\.([0-9]+$)/`)
-        this.leanerShortName = `learner${learnerIdx}`
-        this.learnerRole = this.config?.entities?.learner?.role ?? 'empty'
+        this.loghighlight(`Script runner learner[${this.learnerName}] launchedFrom[${this.opts.scriptFilePath}]`)
+        this.config.scenario ??= {}
         /** see https://playwright.dev/docs/api/class-page#page-set-default-navigation-timeout  */
         this.pwPage.setDefaultNavigationTimeout(this.config.timeouts.defaultNavigationTimeout ?? 1000)
         /** seehttps://playwright.dev/docs/api/class-page#page-set-default-timeout */
@@ -184,11 +182,29 @@ module.exports = class ScriptRunner extends Runnable {
     /** overriden */
     async asyncInit() {
     }
+    get config() {
+        return this.opts.config
+    }
+    get learner() {
+        return this.config.entities.learner
+    }
+    get learnerName() {
+        return this.learner.name
+    }
+    get learnerPwd() {
+        return this.learner.password
+    }
+    get learnerShortName() {
+        return this.learner.shortName
+    }
+    get learnerRole() {
+        return this.learner.role
+    }
+    get scenario() {
+        return this.config.scenario
+    }
     get pwPage() {
         return this.opts.pwPage
-    }
-    get scriptFilePath() {
-        return this.opts.scriptFilePath
     }
     canSendMessage(data) {
         if (isMainThread || _.isNil(_broadCastChannel) || _.isEmpty(data)) return false
@@ -197,7 +213,7 @@ module.exports = class ScriptRunner extends Runnable {
     }
     async sendMessage(type, id, data) {
         data ??= {}
-        data.learner = this.leanerShortName
+        data.learner = this.learnerShortName
         const messagedata = {
             type: type,
             id: id,
@@ -212,7 +228,7 @@ module.exports = class ScriptRunner extends Runnable {
         return messagedata
     }
     geLogName(method) {
-        return this.leanerShortName
+        return this.learnerShortName
     }
     isPlayWright() {
         return this.config.exec === 'playwright'
@@ -241,7 +257,7 @@ module.exports = class ScriptRunner extends Runnable {
         try {
             const _save = async () => {
                 this.screenShotIdx++
-                const ssPath = path.resolve(process.env.SLDX_SCREENSHOTS_DIR_PATH, `${this.threadId}.${this.leanerShortName}.${name}.${this.screenShotIdx}.png`)
+                const ssPath = path.resolve(process.env.SLDX_SCREENSHOTS_DIR_PATH, `${this.threadId}.${this.learnerShortName}.${name}.${this.screenShotIdx}.png`)
                 this.loghighlight(`Save screenshot [${ssPath}]`)
                 await this.pwPage.screenshot({
                     animations: 'disabled',
@@ -266,7 +282,7 @@ module.exports = class ScriptRunner extends Runnable {
     }
     async sendMetrics(clickInfo, duration) {
         try {
-            const data = await this.sendMessage(MESSAGE_METRICS, clickInfo.metric, {
+            await this.sendMessage(MESSAGE_METRICS, clickInfo.metric, {
                 duration: duration,
                 label: `${clickInfo.type}.${clickInfo.label}`
             })
@@ -481,20 +497,26 @@ module.exports = class ScriptRunner extends Runnable {
     async runBefore(method, ...args) {
         const traceEnv = []
         for (const [key, value] of Object.entries(process.env)) {
-            (key == 'LOCAL_WORKER_ID' || key.startsWith('SLDX')) && traceEnv.push(`${key}=${value}`)
+            key.startsWith('SLDX') && traceEnv.push(`${key}=${value}`)
         }
         this.log(`SLDX Variables:\n${traceEnv.sort().join('\n')}\n`)
-        await this.sendMessage(MESSAGE_STATUS, STATUS_BEGIN)
+        this.startTime = new Date().getTime()
+        await this.sendMessage(MESSAGE_STATUS, STATUS_BEGIN,{
+            duration: null
+        })
     }
     async runError(method, e, ...args) {
         await this.sendMessage(MESSAGE_STATUS, STATUS_ERROR, {
-            message: e.message ?? 'no message'
+            message: e.message ?? 'no message',
+            duration: new Date().getTime() - this.startTime
         })
         await this.saveScreenShot('error')
         throw (e)
     }
     async runFinally(method, ok, ...args) {
-        await this.sendMessage(MESSAGE_STATUS, ok ? STATUS_END_OK : STATUS_END_KO)
+        await this.sendMessage(MESSAGE_STATUS, ok ? STATUS_END_OK : STATUS_END_KO,{
+            duration: new Date().getTime() - this.startTime
+        })
     }
     async runStart() {
         await this.beforeLogin()
@@ -503,10 +525,10 @@ module.exports = class ScriptRunner extends Runnable {
         await this.beforeScriptEnd()
     }
     async login(tempo) {
-        this.loghighlight(`login ${this.learnerName}/${this.config.getUserPwd()} [${this.learnerRole}]`)
+        this.loghighlight(`login ${this.learnerName}/${this.learnerPwd} [${this.learnerRole}]`)
         await this.gotoPage(_CLICKABLE.PAGES.CLIENT)
         await this.fillLabel('Veuillez entrer votre identifiant ou e-mail *', this.learnerName)
-        await this.fillLabel('Mot de passe : *', this.config.getUserPwd())
+        await this.fillLabel('Mot de passe : *', this.learnerPwd)
         await this.clickConnect()
         await this.tempo(TEMPO_LOGIN)
     }
@@ -532,7 +554,7 @@ module.exports = class ScriptRunner extends Runnable {
     async afterLogin() {
         this.loghighlight(`afterLogin`)
         await this.clickMenuApprenant()
-        if (this.learnerRole = ROLE_LEARNER) {
+        if (this.learnerRole == ROLE_LEARNER) {
             await this.learnerCheckSatus()
         } else {
             /** In case we want to develop scenarri for other  user roles */
@@ -550,11 +572,23 @@ module.exports = class ScriptRunner extends Runnable {
             this.logwarning(`\n\nProcess must be launched by the runner\n- npm run artillery.script1 --  --sldxenv=playwright.debug\n- npm run playwright.script1 --  --sldxenv=playwright.debug --sldxpwuser=user4 --debug\n\n`)
             throw new Error(`Process must be launched by the runner`)
         }
-        await Runnable.factoryRun.apply(this, [{
-            name: this.name.toLocaleLowerCase(),
+        const name = this.name.toLowerCase()
+        const config = initConfig(name)
+        /** 
+         * SLDX_LEARNER_SHORTNAME/SLDX_LEARNER_SHORTNAME are set by artillery script's launcher according to the learnername provided by artillery 
+         * We update the config there
+         * Playwright launcher uses the default value
+         */
+        assert(!_.isEmpty(config.entities.learner), 'Unexpected empty config.entities.learner entity')
+        config.entities.learner.name = process.env.SLDX_LEARNER_NAME
+        config.entities.learner.shortName = process.env.SLDX_LEARNER_SHORTNAME
+        return Runnable.factoryRun.apply(this, [{
+            name: name,
+            myConsole: myConsole,
+            logPrefix: process.env.SLDX_LEARNER_SHORTNAME,
+            config: config,
             scriptFilePath: scriptFilePath,
-            pwPage: pwPage,
-            myConsole: myConsole
+            pwPage: pwPage
         }])
     }
     static scriptTimeout() {

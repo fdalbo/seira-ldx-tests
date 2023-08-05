@@ -50,18 +50,16 @@
       - ``testFunction: "script1"`` du fichier ``.yml`` donne le nom du test à lancer
    - playwright: ``playwright/script1.spec.js`` 
       - Playwright est utilisé pour la mise au point
-      - Artillery lance autant de tests playwright dans des workers node via la propriété ``- engine: playwright`` du fichier ``.yml``. La vaiable ``LOCAL_WORKER_ID`` est invréentée poru chaque wroker ce qui permet d'utiliser un user par worker basé sur l'index ``LOCAL_WORKER_ID`` et sur ``SLDX_LEARNER_PREFIX`` (user1, user2....)
+      - Artillery lance autant de tests playwright dans des workers node via la propriété ``- engine: playwright`` du fichier ``.yml``. Le VUsers sont fournis par le fichier .csv associé à config.payload
       - Playwright execute tous les tessts (un seul dans notre cas) en parallèle ou non (voir ``playwright.config.js``)
       - Playwright fonctionne comme JEST
 - **Artillery**
    - ``artillery/test-script1-debug.yml``
-      - Lance le script avec un seul user dont le nom est donné par ``SLDX_ARTILLERY_USER_FIRST_IDX``
-      - Le nom du user = ``user(1+SLDX_ARTILLERY_USER_FIRST_IDX)``
-      -  ``user8 pour SLDX_ARTILLERY_USER_FIRST_IDX = '7'``
+      - Lance le script avec un seul learner
+      - Le nom du learner est donné par le fichier .csv associé à la payload de la config yml
    - ``artillery/test-script1.yml`` 
       - Lance le script avec N users (voir propriété ``phases``)
-      - Dans chaque worker (sous-process) le user est calculé via le N° du worker (variable ``LOCAL_WORKER_ID``)
-      -  ``user8 pour worker 8 LOCAL_WORKER_ID = '8'``
+      - Le nom du learner est donné par le fichier .csv associé à la payload de la config yml (lecture séquentielle)
    - ``artillery/test-vusers.yml`` 
       - Lance le script pour tester le fonctionnement d'artilery et des workers
    - Commandes

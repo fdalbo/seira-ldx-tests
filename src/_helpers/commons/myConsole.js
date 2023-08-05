@@ -1,7 +1,6 @@
 'use strict';
 
 const isNumber = require('is-number')
-const clone = require('clone')
 const _ = require('lodash')
 const fs = require('fs')
 const path = require('path')
@@ -73,23 +72,10 @@ const _Console = function () {
         return output
     }
 
-    const _cleanupHttpError = (error) => {
-        let err = error ?? {}
-        while (err != null) {
-            if (err.stack) {
-                const idx = err.stack.findIndex(x => x.includes('sun.') || x.includes('java.') || x.includes('org.'))
-                err.stack = err.stack.slice(0, idx)
-            }
-            err = err.stacktrace ?? err.cause ?? null
-        }
-        return error
-    }
-
     const _processLoggerArgs = (args) => {
         /** strip-ansi removes chalk chars */
-        return [args.map(x => typeof x == 'string' ? stripAnsi(x) : x).reduce((acc, x) => { acc.push(x); return acc }, []).join('\n')]
+        return [args.map(x => typeof x == 'string' ? stripAnsi(x) : x).join('')]
     }
-
 
     /************************************************************************************************************************
      *  EXPORTED METHODS
@@ -235,7 +221,7 @@ const _Console = function () {
         const d = new Date()
         d.setTime(new Date().getTime() - _t0)
         const prefix = chalk.gray(`${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}:${d.getMilliseconds().toString().padStart(3, '0')}`)
-        console.log.apply(console, [threadPrefix, prefix, ...args])
+        console.log.apply(console, [prefix, threadPrefix, ...args])
     }
 
     this.hasLoger = () => {

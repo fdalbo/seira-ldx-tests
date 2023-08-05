@@ -7,9 +7,9 @@ module.exports = {
         mainNbLearners: 1
     },
     scenario:{
-        nbLoopQuiz1: 2,
-        nbLoopQuiz2: 2,
-        nbLoopQuiz3: 2
+        nbLoopQuiz1: 100,
+        nbLoopQuiz2: 100,
+        nbLoopQuiz3: 100
     },
     tempo: {
         default: 1000,

@@ -3,11 +3,18 @@
 # creates 200 workers and run one script per worker 
 config:
   target: http://localhost:2020/
+  payload:
+    # The VUser context provides the values to the script (usercontext.vars.learnername / usercontext.vars.learnername )
+    path: 5000-learners.csv
+    fields:
+      - learnername
+      - password
+    order: sequence
   phases:
-    - name: Warm up phase
+    - name: test vusers
       duration: 10
-      maxVusers: 50
-      arrivalRate: 50
+      arrivalCount: 3
+      arrivalRate: 3
 
 #--------------------------------------------------------------------------------
 # The following example creates 20 virtual users in 60 seconds (one virtual user approximately every 3 seconds):

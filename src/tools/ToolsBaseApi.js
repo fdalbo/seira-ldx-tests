@@ -6,7 +6,7 @@ const { format: prettyFormat } = require('pretty-format')
 const chalk = require('chalk')
 const assert = require('assert')
 const ToolsBase = require('./ToolsBase')
-const { table } = require('table');
+const { table } = require('table')
 
 const _sortProfiles = (a, b) => {
     const aIdx = parseInt(a.name.match(/([0-9]+$)/))
@@ -34,7 +34,7 @@ const _getSessionData = ({ sessionName, careerId, coaches, individualUserIds, gr
             endDate: (() => { const d = new Date(); d.setHours(30 * 24); return d.toISOString() })(),
             learners: {
                 groupIds: [...groupIds],
-                individualUserIds: [...individualUserIds],
+                individualUserIds: [...individualUserIds]
             },
             color: '#9c27b0',
             cardsToUnlockInfo: [],
@@ -186,7 +186,7 @@ module.exports = class ToolsBaseApi extends ToolsBase {
     }
     _logUrl(type, httpCli, method, path) {
         const text = httpCli == this.#httpCli ? `proxy ${type}` : `sso ${type}`
-        const header = chalk[type == 'request' ? 'magenta' : 'cyan'](text.padEnd(14, ' '))
+        const header = chalk[type == 'request' ? 'magenta' : 'cyan'](text)
         this.log(`[${header}] ${_methodColor[method]}[${httpCli.defaults.baseURL}${path}]`)
     }
     logHttpRequest(httpCli, method, path, ...args) {
@@ -333,7 +333,7 @@ module.exports = class ToolsBaseApi extends ToolsBase {
     async deleteSessionById(id) {
         this.loghighlight(`deleteSessionById [${id}]`)
         assert(!_.isEmpty(id), 'Empty session id')
-        const result = await this.delete('/server/api/careers-publish-sessions', id, 'true')
+        await this.delete('/server/api/careers-publish-sessions', id, 'true')
         this.loghighlight(`session id[${id}] deleted`)
     }
     async createTestSession() {

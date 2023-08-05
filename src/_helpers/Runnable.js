@@ -27,7 +27,6 @@ module.exports = class Runnable extends Loggable {
         let error = null
         try {
             this.logsuperhighlight(`RunMethod begin logName$[${logName}]`)
-            this.initFileLogegr(logName)
             await this.runBefore.apply(this, [method, ...args])
             await method.apply(this, args)
             await this.runAfter.apply(this, [method, ...args])

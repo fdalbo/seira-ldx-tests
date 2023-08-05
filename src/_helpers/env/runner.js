@@ -12,6 +12,7 @@ const os = require('os')
 const dotenv = require('dotenv')
 const myConsole = require('#commons/myConsole')
 const _ = require('lodash')
+const assert = require('assert')
 const dateFormat = require('dateformat')
 const { format: prettyFormat } = require('pretty-format')
 const { pause } = require('#commons/promises')
@@ -28,6 +29,7 @@ process.on('uncaughtException', function (err) {
     setTimeout(() => process.exit(), 500)
 })
 
+const _expectedCommands = ['node', 'artillery', 'playwright']
 const _replaceDateTags = (string) => {
     string ??= ''
     const date = dateFormat(new Date(), 'yyyy-mm-dd-HH-MM-ss')
@@ -81,7 +83,7 @@ const _init = (mainScriptPath, additionalEnvVars) => {
 
 const _setRunnerEnvVar = (environmentVariables, name, value) => {
     const envVar = environmentVariables.find(x => x.name === name)
-    if (!envVar) {
+    if (_.isEmpty(envVar)) {
         myConsole.warning(`Runer env variable not found [${name}][${value}]`)
         return
     }
@@ -117,6 +119,7 @@ module.exports = async function (mainScriptPath, additionalEnvVars, options) {
                 childProcessArgs = ['--no-warnings', '--es-module-specifier-resolution=node', '--trace-warnings', scriptToRunFullPath, ...notEnvVarsArguments]
                 break
             case 'artillery':
+                // eslint-disable-next-line no-case-declarations
                 const reportDir = path.resolve(appRootDir.get(), 'artillery-report')
                 fs.ensureDir(reportDir)
                 const reportName = [path.basename(scriptToRunRelativePath, '.yml'), _replaceDateTags(process.env.SLDX_ARTILLERY_REPORT_SUFFIX ?? '')].filter(x => x.length != 0)
@@ -142,9 +145,7 @@ module.exports = async function (mainScriptPath, additionalEnvVars, options) {
                 throw new Error(`Unexpected runner command [${options.exec}] Expected[${_expectedCommands.join(',')}]`)
         }
         let command = `${exec} ${childProcessArgs.join(' ')}`
-        if (!fs.existsSync(scriptToRunFullPath)) {
-            throw new Error(`Command[${command}] - Script file not found\n${scriptToRunFullPath}`)
-        }
+        assert(fs.existsSync(scriptToRunFullPath), `Command[${command}] - Script file not found\n${scriptToRunFullPath}`)
         if (exec === 'artillery') {
             const yamlConfig = fs.readFileSync(scriptToRunFullPath, { encoding: "utf8" })
             let parsedConfig = null
@@ -160,20 +161,20 @@ module.exports = async function (mainScriptPath, additionalEnvVars, options) {
                 maxVusers: 1,
                 arrivalRate: 1
             }]
-            if (phases.length > 1) {
-                throw new Error(`[artillery] zero or one phase expected got[${phases.length}] file [${scriptToRunFullPath}]`)
+            assert(phases.length >= 1, `[artillery] zero or one phase expected got[${phases.length}] file [${scriptToRunFullPath}]`)
+            const jsonCfg = {
+                maxVusers: phases[0].maxVusers ?? 'empty',
+                arrivalRate: phases[0].arrivalRate ?? 'empty',
+                arrivalCount: phases[0].arrivalCount ?? 'empty',
+                duration: phases[0].duration ?? 'empty'
             }
-            const maxVusers = phases[0].maxVusers ?? 1
-            const arrivalRate = phases[0].arrivalRate ?? 1
-            if (maxVusers != arrivalRate) {
-                throw new Error(`[artillery] YAML config error - Expected maxVusers[${maxVusers}] equals to  arrivalRate[${arrivalRate}]\nFile[${scriptToRunFullPath}]`)
-            }
-            _setRunnerEnvVar(environmentVariables, 'SLDX_ARTILLERY_NB_VUSERS', maxVusers)
+            myConsole.highlight(`Artillery: duration[${jsonCfg.duration}] arrivalCount[${jsonCfg.arrivalCount}] arrivalRate[${jsonCfg.arrivalRate}] maxVusers[${jsonCfg.maxVusers}]`)
+            _setRunnerEnvVar(environmentVariables, 'SLDX_ARTILLERY_JSON_CFG', JSON.stringify(jsonCfg))
             /** 
              * We need to add the number of workers
              * Currently we can launch one script per worker (artillery laucnhes multiple scipts per worker
              */
-            process.env.WORKERS = maxVusers
+            /** disabled process.env.WORKERS = 1 */
         }
         myConsole.highlight(`COMMAND: '${command}'`)
         /** RUN SCRIPT - Execute the script in a child process */

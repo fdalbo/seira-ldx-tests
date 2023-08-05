@@ -226,7 +226,7 @@ module.exports = class ToolsScript1Mongo extends ToolsBaseMongo {
                 }
                 groupsToCreate.push(groupInfo)
             } else if (group.profiles.length != expectedProfiles) {
-                errors.push(`Group[${groupeName}] - Expected profiles[${sexpectedProfiles}] - Got [${group.profiles.length}]`)
+                errors.push(`Group[${groupeName}] - Expected profiles[${expectedProfiles}] - Got [${group.profiles.length}]`)
             } else {
                 this.log(`Group[${groupeName}] already exists with the expected number of profiless [${expectedProfiles}] `)
             }

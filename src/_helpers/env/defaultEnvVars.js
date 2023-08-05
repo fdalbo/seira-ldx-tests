@@ -169,11 +169,7 @@ const DEFAULT_VARS = [
         name: 'SLDX_LEARNER_ENCRYPTED_PWD',
         value: '$2a$10$egusEbUGmahKRCwcLgks1el2DyNJadEbNM57BnouqynHkn5VxZjj.'
     }, {
-        name: 'SLDX_ARTILLERY_USER_FIRST_IDX',
-        arg: `${_ARGS_PREFIX}FirstIdx`,
-        type: 'numeric',
-        value: '0'
-    }, {
+        /** _PREFIX Used by DB tools */
         name: 'SLDX_LEARNER_PREFIX',
         value: 'testperfs.learner.'
     }, {
@@ -208,12 +204,22 @@ const DEFAULT_VARS = [
         highlight: true,
         value: './playwright',
     },{
-        name: 'SLDX_PLAYWRIGHT_LEARNER_NAME',
+        name: 'SLDX_LEARNER_NAME',
         arg: `${_ARGS_PREFIX}pwleaner`,
-        /**  SLDX_LEARNER_PREFIX + 1 - only on learner in playwright mode */
+        /** 
+         * this is the default value when we launch playwright outiside artillery
+         * with artillery the value is set with the 
+         */
         value: 'testperfs.learner.1'
     },
     /* calculated by runner node, playwright, artillery*/
+    {
+        /** calcuated by runer once we get the learner name (artillery) */
+        name: 'SLDX_LEARNER_SHORTNAME',
+        source: 'calculated',
+        allowEmpty: true,
+        value: ''
+    },
     {
         name: 'SLDX_RUNNER_EXEC',
         source: 'calculated',
@@ -239,7 +245,7 @@ const DEFAULT_VARS = [
         type: 'numeric',
         value: new Number(10 * 60 * 60 * 1000).toString()
     }, {
-        name: 'SLDX_ARTILLERY_NB_VUSERS',
+        name: 'SLDX_ARTILLERY_JSON_CFG',
         allowEmpty: true
     }
 ]
@@ -280,7 +286,7 @@ module.exports.appendToDefaultVars = function (myEnvVars) {
             return false
         }
         if (x.values && x.values.indexOf(x.value) < 0) {
-            myConsole.warning(`!! Environment variable ${x.name} - Unexpected value ${x.value}\Expected values : '${x.values.join(',')}'`)
+            myConsole.warning(`!! Environment variable ${x.name} - Unexpected value ${x.value}\nExpected values : '${x.values.join(',')}'`)
         }
         return true
     })

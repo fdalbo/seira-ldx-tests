@@ -1,7 +1,7 @@
 config:
   target: http://localhost:2020/
   phases:
-    - name: Warm up phase
+    - name: test workers
       duration: 1
       maxVusers: 3
       arrivalRate: 3

@@ -5,13 +5,19 @@
 # - script1 run the script [src/scripts/Script1.js] insde chromium via playwright
 config:
   target: http://localhost:2020/
+  payload:
+    # The VUser context provides the values to the script (usercontext.vars.learnername / usercontext.vars.learnername )
+    path: 5000-learners.csv
+    fields:
+      - learnername
+      - password
+    order: sequence
   # debug -> one worker
   # Load the Playwright engine:
-phases:
-  - name: testSeira
-    duration: 1
-    maxVusers: 1
-    arrivalRate: 1
+  phases:
+    - name: test script1
+      duration: 100
+      arrivalCount: 50
   engines:
     playwright: {}
   # Path to JavaScript file that defines Playwright test functions
@@ -22,3 +28,4 @@ before:
 scenarios:
   - engine: playwright
     testFunction: testRunScript1
+
