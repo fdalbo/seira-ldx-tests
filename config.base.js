@@ -83,9 +83,9 @@ const _baseConfig = {
             role: exports.ROLE_ADMIN
         },
         learner: {
-            /** !! overriden by artillery (see artillery/tests-artillery.js) */
-            name: process.env.SLDX_LEARNER_NAME,
-            shortName: process.env.SLDX_LEARNER_SHORTNAME,
+            /** Calculated by script launcher see artillery/tests-artillery.js and playwright/script1.spec.js */
+            name: null,
+            shortName: null,
             /** Used by DB tools */
             prefix: process.env.SLDX_LEARNER_PREFIX,
             password: process.env.SLDX_LEARNER_PWD,
@@ -177,8 +177,8 @@ const _initConfig = (scriptId) => {
     let fileNameScript = `config.${scriptId.toLowerCase()}.js`
     if (!_.isEmpty(testEnv)) {
         /**
-         * if SLDX_ENV_VAR=local
-         * searches for config.script1.local.env
+         * if SLDX_ENV_VAR=default
+         * searches for config.script1.default.env
          * if not found searches for config.script1.env
          * if not found error
          */

@@ -48,12 +48,12 @@ const _init = (mainScriptPath, additionalEnvVars) => {
     })
     /**
      * Program arguments
-     * npm run perfs.test1 -- --sldxenv=local
+     * npm run perfs.test1 -- --sldxenv=default
      * --> Reads sldxenv in arguments
-     * --> Expected dotEnvFilePath for the scenario: 'sldx.local.dotenv'
+     * --> Expected dotEnvFilePath for the scenario: 'sldx.default.dotenv'
      * npm run perfs.test1
-     * --> Reads sldxenv .env  (fSLDX_ENV=local)
-     * --> Expected dotEnvFilePath for the scenario: 'sldx.local.dotenv'
+     * --> Reads sldxenv .env  (fSLDX_ENV=default)
+     * --> Expected dotEnvFilePath for the scenario: 'sldx.default.dotenv'
      */
     const tests_env = readSldxEnv(myConsole)
     const dotEnvFileName = `${ARGS_PREFIX}.${tests_env}.dotenv`
@@ -157,11 +157,8 @@ module.exports = async function (mainScriptPath, additionalEnvVars, options) {
                 })
             }
             myConsole.lowlight(`\nArtillery config:\n${JSON.stringify(parsedConfig, null, 2)}\n`)
-            const phases = parsedConfig?.config?.phases ?? [{
-                maxVusers: 1,
-                arrivalRate: 1
-            }]
-            assert(phases.length >= 1, `[artillery] zero or one phase expected got[${phases.length}] file [${scriptToRunFullPath}]`)
+            const phases = parsedConfig?.config?.phases ?? []
+            assert(phases.length === 1, `[artillery] one phase expected got[${phases.length}] file[${scriptToRunFullPath}]`)
             const jsonCfg = {
                 maxVusers: phases[0].maxVusers ?? 'empty',
                 arrivalRate: phases[0].arrivalRate ?? 'empty',
@@ -171,10 +168,12 @@ module.exports = async function (mainScriptPath, additionalEnvVars, options) {
             myConsole.highlight(`Artillery: duration[${jsonCfg.duration}] arrivalCount[${jsonCfg.arrivalCount}] arrivalRate[${jsonCfg.arrivalRate}] maxVusers[${jsonCfg.maxVusers}]`)
             _setRunnerEnvVar(environmentVariables, 'SLDX_ARTILLERY_JSON_CFG', JSON.stringify(jsonCfg))
             /** 
-             * We need to add the number of workers
-             * Currently we can launch one script per worker (artillery laucnhes multiple scipts per worker
+             * Artillerry manages a pool of 11 workers by default (should be enought)
+             * If we want more we need to set WORKERS with the number of workers to create
              */
-            /** disabled process.env.WORKERS = 1 */
+            if (jsonCfg.maxVusers > 11){
+                process.env.WORKERS = jsonCfg.maxVusers
+            }
         }
         myConsole.highlight(`COMMAND: '${command}'`)
         /** RUN SCRIPT - Execute the script in a child process */

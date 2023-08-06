@@ -67,6 +67,7 @@ module.exports = class ScriptMonitoring extends Loggable {
     lastMessage = null
     forceUpdate = false
     startTime = null
+    threadCounter = new Set()
     constructor(opts) {
         super(opts)
         this.scriptName = opts.scriptName
@@ -194,7 +195,7 @@ module.exports = class ScriptMonitoring extends Loggable {
         const elapsed = now - this.startUpdate
         const artilleryCfg = JSON.parse(process.env.SLDX_ARTILLERY_JSON_CFG)
         console.log(chalk.yellowBright('\n\n-----------------------------------------------------------------------------------'))
-        console.log(chalk.yellowBright(`SCRIPT ${this.scriptName.toUpperCase()} running for ${chalk.greenBright(prettyMS(elapsed, PRETTY_MS_OPTS))}`))
+        console.log(chalk.yellowBright(`SCRIPT ${this.scriptName.toUpperCase()} running for ${chalk.greenBright(prettyMS(elapsed, PRETTY_MS_OPTS))} in ${chalk.greenBright(this.threadCounter.size)} thread(s)`))
         console.log(chalk.yellowBright('-----------------------------------------------------------------------------------'))
         console.log(chalk.grey(`env[${process.env.SLDX_ENV}] config[${path.basename(this.scriptConfig.fileName)}]`))
         console.log(titleColor(`Artillery config:`))
@@ -331,6 +332,7 @@ module.exports = class ScriptMonitoring extends Loggable {
         status.counter = status.counter + 1
         if (data.id === STATUS_BEGIN) {
             status.times.push(now - this.startTime)
+            this.threadCounter.add(data.emitter)
         } else if (data.data.duration) {
             status.times.push(data.data.duration)
         }

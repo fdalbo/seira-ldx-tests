@@ -11,15 +11,17 @@
   "scripts": {
     "list": "node ./scripts/commands.list",
     "items": "node ./scripts/command.items.js",
-    "display.vars.debug": "node runner.node.js displayvars.js --sldxenv=debug",
-    "artillery.test.workers": "node runner.artillery.js test-workers.yml",
-    "artillery.test.vusers": "node runner.artillery.js test-vusers.yml",
-    "artillery.script1.local": "node runner.artillery.js script1-local.yml",
-    "artillery.script1.local.debug": "node runner.artillery.js script1-local-debug.yml --sldxenv=debug",
+    "display.vars.debug": "node runner.node.js displayvars.js",
+    "artillery.test.vusers.one.thread": "node runner.artillery.js test-vusers-one-thread.yml",
+    "artillery.test.vusers.multiple.threads": "node runner.artillery.js test-vusers-multiple-threads.yml",
+    "artillery.test.vusers.multiple.threads.maxvusers": "node runner.artillery.js test-vusers-multiple-threads-50-workers.yml.yml",
+    "artillery.script1.50.learners": "node runner.artillery.js script1-50-learners.yml",
+    "artillery.script1.100.learners": "node runner.artillery.js script1-100-learners.yml",
+    "artillery.script1.50.learners.2.threads": "node runner.artillery.js script1-50-learners-2-threads.yml",
     "playwright.script1": "node runner.playwright.js script1.spec.js",
-    "playwright.script1.debug": "node runner.playwright.js script1.spec.js --sldxenv=debug --debug",
-    "tools.mongo.script1.debug": "node runner.node.js  ./scripts/tools.mongo.script1.js --sldxenv=debu",
-    "tools.api.script1.debug": "node runner.node.js ./scripts/tools.api.script1.js --sldxenv=debug"
+    "playwright.script1.debug": "node runner.playwright.js script1.spec.js --debug",
+    "tools.mongo.script1.debug": "node runner.node.js  ./scripts/tools.mongo.script1.js",
+    "tools.api.script1.debug": "node runner.node.js ./scripts/tools.api.script1.js"
   },
   "imports": {
     "#src/*": "./src/*.js",

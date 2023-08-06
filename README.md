@@ -30,7 +30,7 @@
     ````
         SLDX_ENV=debug
     ```
-  - la valeur par défaut 'local' (voir src/_helpers/env/defaultEnvVars.js)
+  - la valeur par défaut 'default' (voir src/_helpers/env/defaultEnvVars.js)
 - ``SLDX_ENV`` permet de piloter les fichiers de configuration
   - exemple pour ``npm run artillery.script1 -- --sldxenv=toto``
   - ``sldx.toto.dotenv`` surcharge les valeurs par défaut

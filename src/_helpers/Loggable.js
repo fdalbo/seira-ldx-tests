@@ -38,7 +38,7 @@ module.exports = class Loggable {
         return this.myConsole.threadId
     }
     consoleArgs(...args) {
-        return _.isEmpty(this.opts.logPrefix) ? args : [chalk.green(this.opts.logPrefix), ...args]
+        return _.isEmpty(this.opts.logPrefix) ? args : [chalk.green(this.opts.logPrefix), ' ', ...args]
     }
     /**
      * Not in console - only in file logger

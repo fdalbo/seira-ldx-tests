@@ -7,8 +7,8 @@
  * npm run display.vars.debug  (sldxenv=debug by default)
  * --> file: sldx.debug.dotenv
  * 
- * npm run display.vars.debug -- --sldxenv=local
- * --> file: sldx.local.dotenv
+ * npm run display.vars.debug -- --sldxenv=default
+ * --> file: sldx.default.dotenv
  */
 (async()=>{
 

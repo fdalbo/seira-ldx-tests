@@ -10,10 +10,9 @@ module.exports.SLDX_ENV_VAR = _SLDX_ENV_VAR
 /** -- --sldxenv=xxx */
 const _SLDX_ENV_ARG = `${_ARGS_PREFIX}env`
 const DEFAULT_VARS = [
-    /** .env file id ./local.dotenv by default */
     {
         name: _SLDX_ENV_VAR,
-        value: 'local',
+        value: 'default',
         highlight: true,
         arg: _SLDX_ENV_ARG
     }, {
@@ -26,7 +25,7 @@ const DEFAULT_VARS = [
         /** Worker 1 prefix=W0001 */
         name: 'SLDX_CONSOLE_THREAD_NBDIGITS',
         allowEmpty: true,
-        value: '4',
+        value: '3',
         type: 'boolean'
     }, {
         name: 'SLDX_TRACE_HTTP_REQUESTS',
@@ -199,26 +198,44 @@ const DEFAULT_VARS = [
          */
         value: '$day',
     }, {
+        name: 'SLDX_ARTILLERY_MAINTHREAD_OFFSET',
+        allowEmpty: true,
+        /** 
+         * Used to calculate the learnerName (SLDX_LEARNER_PREFIX) IN MAIN THREAD
+         * Each time a test is launched (testCounter) in the MAIN thread we calculate the learnerName (used or login) with the following method:
+         * SLDX_LEARNER_PREFIX + SLDX_ARTILLERY_MAINTHREAD_OFFSET + testCounter
+         * Eg: if SLDX_ARTILLERY_MAINTHREAD_OFFSET = 0
+         *     - first test: testperfs.learner.1
+         *     - second test: testperfs.learner.2
+         * Eg: if SLDX_ARTILLERY_MAINTHREAD_OFFSET = 100
+         *     - first test: testperfs.learner.101
+         *     - second test: testperfs.learner.102
+         * If we provide a .csv file to artillery (payload.path) with the user names the file is read from the begining for each thread/worker
+         * - We can't have the same learner logged in twice (the test fails whe we check the progression which must be equal to 0%)
+         * - We need to calculate a unique learner name per test regardless of the thread it is run in
+         * If we use 'arrivalCount' (advised) to manage the rampup, Artillery will run all the tests in the same thread
+         * - We don't have threads conflicts
+         * If we use 'arrivalRate' (number of tests/vusers created per second) to manage the rampup, Artillery can potentially run the tests in multiple thread
+         * - We can have threads conflicts and it's why we need to calculate a unic learnerName
+        */
+        value: '0',
+    }, {
+        name: 'SLDX_ARTILLERY_WORKER_OFFSET',
+        allowEmpty: true,
+        /** 
+         * Used to calculate the learnerName (SLDX_LEARNER_PREFIX) in WORKER THREAD
+         * Each time a test is launched (testCounter) in a WORKER thread we calculate the learnerName with the following method:
+         * SLDX_LEARNER_PREFIX + SLDX_ARTILLERY_WORKER_OFFSET + testCounter
+         * Eg: if SLDX_ARTILLERY_MAINTHREAD_OFFSET = 500
+         *     - first test: testperfs.learner.501
+         *     - second test: testperfs.learner.502
+        */
+        value: '500',
+    }, {
         name: 'SLDX_PLAYWRIGHT_ROOT_DIR',
         dirPath: true,
         highlight: true,
         value: './playwright',
-    },{
-        name: 'SLDX_LEARNER_NAME',
-        arg: `${_ARGS_PREFIX}pwleaner`,
-        /** 
-         * this is the default value when we launch playwright outiside artillery
-         * with artillery the value is set with the 
-         */
-        value: 'testperfs.learner.1'
-    },
-    /* calculated by runner node, playwright, artillery*/
-    {
-        /** calcuated by runer once we get the learner name (artillery) */
-        name: 'SLDX_LEARNER_SHORTNAME',
-        source: 'calculated',
-        allowEmpty: true,
-        value: ''
     },
     {
         name: 'SLDX_RUNNER_EXEC',
@@ -309,7 +326,7 @@ module.exports.getEnvValues = function () {
 
 /**
  * Program arguments
- * - npm run perfs.test1 -- --sldxenv=local
+ * - npm run perfs.test1 -- --sldxenv=default
  * Read arguments that start with --${ARGS_PREFIX}
  * @returns  a map with argid/argValue
  */

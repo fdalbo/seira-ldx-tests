@@ -161,7 +161,7 @@ module.exports = class ScriptRunner extends Runnable {
     stepIdx = 0
     screenShotIdx = 0
     metrics = null
-    startTime  = null
+    startTime = null
     constructor(opts) {
         opts = Object.assign({
             scriptFilePath: null,
@@ -501,7 +501,7 @@ module.exports = class ScriptRunner extends Runnable {
         }
         this.log(`SLDX Variables:\n${traceEnv.sort().join('\n')}\n`)
         this.startTime = new Date().getTime()
-        await this.sendMessage(MESSAGE_STATUS, STATUS_BEGIN,{
+        await this.sendMessage(MESSAGE_STATUS, STATUS_BEGIN, {
             duration: null
         })
     }
@@ -514,7 +514,7 @@ module.exports = class ScriptRunner extends Runnable {
         throw (e)
     }
     async runFinally(method, ok, ...args) {
-        await this.sendMessage(MESSAGE_STATUS, ok ? STATUS_END_OK : STATUS_END_KO,{
+        await this.sendMessage(MESSAGE_STATUS, ok ? STATUS_END_OK : STATUS_END_KO, {
             duration: new Date().getTime() - this.startTime
         })
     }
@@ -567,7 +567,7 @@ module.exports = class ScriptRunner extends Runnable {
     async beforeScriptEnd() {
         await pause(1000);
     }
-    static async factoryRun(scriptFilePath, pwPage, myConsole) {
+    static async factoryRun(scriptFilePath, pwPage, myConsole, learnerName, learnerShortName, learnerPassword) {
         if (_.isEmpty(process.env.SLDX_RUNNER_EXEC)) {
             this.logwarning(`\n\nProcess must be launched by the runner\n- npm run artillery.script1 --  --sldxenv=playwright.debug\n- npm run playwright.script1 --  --sldxenv=playwright.debug --sldxpwuser=user4 --debug\n\n`)
             throw new Error(`Process must be launched by the runner`)
@@ -575,17 +575,22 @@ module.exports = class ScriptRunner extends Runnable {
         const name = this.name.toLowerCase()
         const config = initConfig(name)
         /** 
-         * SLDX_LEARNER_SHORTNAME/SLDX_LEARNER_SHORTNAME are set by artillery script's launcher according to the learnername provided by artillery 
+         * learnerName, shortName and password are calculated by artillery script's launcher in order to ensure a unic learnerName per thread and script
          * We update the config there
-         * Playwright launcher uses the default value
+         * Playwright launcher uses a default value
          */
         assert(!_.isEmpty(config.entities.learner), 'Unexpected empty config.entities.learner entity')
-        config.entities.learner.name = process.env.SLDX_LEARNER_NAME
-        config.entities.learner.shortName = process.env.SLDX_LEARNER_SHORTNAME
+        learnerName ??= ''
+        learnerShortName ??= ''
+        learnerPassword ??= ''
+        assert(!_.isEmpty(learnerName.trim()), 'Unexpected learnerName')
+        config.entities.learner.name = learnerName.trim()
+        config.entities.learner.shortName = learnerShortName.trim()
+        config.entities.learner.password = learnerPassword.trim()
         return Runnable.factoryRun.apply(this, [{
             name: name,
             myConsole: myConsole,
-            logPrefix: process.env.SLDX_LEARNER_SHORTNAME,
+            logPrefix: config.entities.learner.shortName,
             config: config,
             scriptFilePath: scriptFilePath,
             pwPage: pwPage
@@ -594,7 +599,7 @@ module.exports = class ScriptRunner extends Runnable {
     static scriptTimeout() {
         const to = parseInt(process.env.SLDX_PLAYWRIGTH_SCRIPT_TIMEOUT)
         if (isNaN(to)) {
-            throw new Error('Unexpected not number process process.env.SLDX_PLAYWRIGTH_SCRIPT_TIMEOUT')
+            throw new Error('Unexpected non-Integer process.env.SLDX_PLAYWRIGTH_SCRIPT_TIMEOUT')
         }
         return to
     }

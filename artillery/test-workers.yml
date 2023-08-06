@@ -3,8 +3,8 @@ config:
   phases:
     - name: test workers
       duration: 1
-      maxVusers: 3
-      arrivalRate: 3
+      maxVusers: 30
+      arrivalRate: 30
   engines:
     playwright: {}
   processor: "./tests-artillery.js"

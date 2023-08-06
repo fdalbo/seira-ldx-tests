@@ -1,10 +1,9 @@
 /**
  * THIS IS THE JS FILE CALLED BY ARTILLERY (SEE .YML ABOVE)
  */
-module.exports = { testRunScript1, testInitScript1, testVUsers, testWorkers };
+module.exports = { testRunScript1, testInitScript1, testVUsers };
 const {
   isMainThread,
-  BroadcastChannel,
   threadId
 } = require('worker_threads');
 const Script1 = require('#scripts/Script1')
@@ -12,39 +11,71 @@ const myConsole = require('#commons/myConsole')
 const ToolsBaseApi = require('#tools/ToolsBaseApi')
 const appRootDir = require('app-root-dir')
 const _ = require('lodash')
+const chalk = require('chalk')
+const path = require('path')
 const assert = require('assert')
 // eslint-disable-next-line no-unused-vars
 const { format: prettyFormat } = require('pretty-format')
 const {
-  METRIC_CARDS,
-  METRIC_QUIZ,
-  METRIC_NAV,
-  MESSAGE_STATUS,
-  MESSAGE_BROADCAST_CHANNEL,
-  MESSAGE_METRICS,
   getLearnerShortName
 } = require(`${appRootDir.get()}/config.base`)
 
+let _learnerCounter = (() => {
+  const wasConsoleEnabled = process.env.SLDX_CONSOLE_TRACE === 'true'
+  try {
+    /* force console for init phase **/
+    myConsole.enableConsole(true)
+    /** 
+     * We've a console per worker or main thread
+     * 'ScriptMonitoring' and 'testInitScript1' log in main thread log file
+     * It's artillery that manages the dispatching of the tests execution into the threads
+     */
+    myConsole.initLoggerFromModule(`artillery.test`)
+    if (isMainThread) {
+      return
+    }
+    /**
+     * learnerCounter is used to calculate the learnerName per test/thread
+     * -> testperfs.learner.${learnerCounter}
+     * We need to have a unic learnerName whatever the thread/worker
+     * Script is expected to run in a worker starting from threadid=1
+     * We expect that the users have been created before running the test
+     * If we use 'arrivalCount' (advised) to manage the ramp-up, Artillery will run all the tests in the same thread (worker 1)
+     * - We don't have learnerNames' conflicts
+     * If we use 'arrivalRate' (number of tests/vusers created per second) to manage the rampup, Artillery can potentially run the tests in multiple threads
+     * - We can have learnerNames' conflicts and it's why we need to calculate a unic learnerName
+     */
+    const threadOffset = (() => {
+      const offset = process.env.SLDX_ARTILLERY_WORKER_OFFSET
+      const result = parseInt(offset)
+      assert(_.isInteger(result), `Thread[${threadId}] - Unexpected non-integer offset[${offset}] (check SLDX_ARTILLERY_WORKER_OFFSET)`)
+      assert(result > 100, `Thread[${threadId}] - Unexpected < 100 SLDX_ARTILLERY_WORKER_OFFSET`)
+      return result
+    })()
+    const threadNumericId = parseInt(threadId)
+    assert(_.isInteger(threadNumericId), `Thread[${threadId}] - Unexpected non-integer threadId[${threadId}]`)
+    /*
+     * learnerCounter MUST BE UNIC PAR THREAD AND SCRIPT
+     * For SLDX_ARTILLERY_WORKER_OFFSET = 500
+     * Worker thread N°1 with offset 500 tesperfs.learner.1, 2,... (threadid-1)*SLDX_ARTILLERY_WORKER_OFFSET
+     * Worker thread N°2 with offset 500 tesperfs.learner.501, 502,...
+     */
+    const learnerCounter = threadOffset * (threadNumericId - 1)
+    myConsole.superhighlight(`Load ${path.basename(__filename)} threadId[${threadId}] threadOffset[${threadOffset}] learnerCounter[${learnerCounter}]`)
+    return learnerCounter
+  } finally {
+    myConsole.enableConsole(wasConsoleEnabled)
+  }
+})()
 
-
-/** To control the number of scripts per workers (only one) */
-const getcpt = (cpt) => {
-  const r = parseInt(process.env[cpt])
-  process.env[cpt] = `${r + 1}`
-  return r
+const _calculateLearnerInfo = () => {
+  _learnerCounter += 1
+  const learnerName = `${process.env.SLDX_LEARNER_PREFIX}${_learnerCounter}`
+  const learnerShortName = getLearnerShortName(learnerName)
+  const learnerPassword = process.env.SLDX_LEARNER_PWD
+  myConsole.highlight(`learnername[${learnerName}] learnershortname[${learnerShortName}] password[${learnerPassword}]`)
+  return { learnerName, learnerShortName, learnerPassword }
 }
-
-if (!process.env.SLDX_CPT_LOAD) {
-  process.env.SLDX_CPT_LOAD = '1'
-}
-myConsole.highlight(`ARTILLERY LOAD TEST.JS [${myConsole.threadId}] [${getcpt('SLDX_CPT_LOAD')}]`)
-
-/** 
- * We've on console per worker or main thread
- * ScriptMonitoring and testInitScript1 log in main thread log file
- * It's artillery that manages the dispatching of the tests' execution into the threads
- */
-myConsole.initLoggerFromModule(`artillery.test`)
 
 /**************************************************************************************************
  * RUN 'Script1' with playwright engine
@@ -54,27 +85,15 @@ myConsole.initLoggerFromModule(`artillery.test`)
  * @param {*} userContext artillery context 
  **************************************************************************************************/
 async function testRunScript1(pwPage, userContext, event) {
-  assert(!_.isEmpty(userContext.vars.learnername), 'Unexpected empty userContext.vars.learnername - Check yml file - payload/path/fieldslearnername must provide the learner name')
-  /** Set SLDX_LEARNER_NAME with the value given by artillery through the .csv file */
-  process.env.SLDX_LEARNER_NAME = userContext.vars.learnername
-  process.env.SLDX_LEARNER_SHORTNAME = getLearnerShortName(process.env.SLDX_LEARNER_NAME)
-  /** userContext.vars.password not used - same password SLDX_LEARNER_PWD for all leaners */
-  if (!process.env.SLDX_CPT_RUN) {
-    process.env.SLDX_CPT_RUN = '1'
-  }
-  // eslint-disable-next-line no-constant-condition
-  if (false && process.env.SLDX_LOADED == 'true') {
-    /**
-     * Currently we can't run multiple scripts in the same worker (the way artillery is working)
-     * We need to create as many worker as VUsers (set WORKERS=#VUsers before runing artillery)
-     * --> see src/_helpers/env/runner.js
-     */
-    myConsole.red(`Artillery run script '${Script1.name}' cpt[${getcpt('SLDX_CPT_RUN')}] - ALREADY LOADED - SKIP`)
-    return
-  }
-  process.env.SLDX_LOADED = 'true'
-  myConsole.superhighlight(`Artillery run test '${Script1.name}' username[${userContext.vars.learnername}] password[${userContext.vars.password}]`)
-  await Script1.factoryRun.apply(Script1, [__filename, pwPage, myConsole])
+  assert(!isMainThread, 'artillery is not supposed to lanch a script in the main thread')
+  /**
+   * If we use a .csv file (payload.path) in yml file, the user name is provided by artillery (userContext.vars.learnername)
+   * The problem is that artillery read the .csv file from the beginning for each thread/worker
+   * -> We can use this feature as we need a unic learnerName per thread
+   */
+  myConsole.superhighlight(`Artillery run test '${Script1.name}`)
+  const { learnerName, learnerShortName, learnerPassword } = _calculateLearnerInfo()
+  await Script1.factoryRun.apply(Script1, [__filename, pwPage, myConsole, learnerName, learnerShortName, learnerPassword])
 }
 
 /***************************************************************************************************
@@ -86,14 +105,14 @@ async function testInitScript1(userContext, event, done) {
   const scriptName = Script1.name.toLowerCase()
   myConsole.superhighlight(`Artillery init test '${scriptName}'`)
   /**
-   * Init Script si launched by artilery in main thread 
+   * Init Script si expected to be launched by artilery in main thread 
    */
   assert(isMainThread, `Unexpected thread Expected[MAIN] Got[${threadId}]`)
   /**
    * MAIN PROCESS 
-   * We can open a listener on the BroadcastChannel to receive the messages from the workers
-   * - It's a workaround because we do'nt hace acces to the worker (doen by artillery)
-   * - It's needed to control the execution and store our metrics 
+   * We can open a listener on the BroadcastChannel to receive the messages (metrics) sent by the workers
+   * - It's a workaround because we don't have access to the worker (created by artillery) in order to open a channel
+   * - BroadcastChannel is needed to monitor (ScriptMonitoring) the execution and store/display the metrics 
    * - Artillery metrics are very poor with playwright because we stay always on the same page (perhaps there's a way to measure chromium httprequests)
    */
   const ScriptMonitoring = require('#scripts/ScriptMonitoring')
@@ -109,86 +128,26 @@ async function testInitScript1(userContext, event, done) {
     scriptId: scriptName
   })
   await api.resetTestEnvironment()
+  /** now we're ready to launch the tests */
   return done()
 }
 
 /***************************************************************************************************
  * VUser tests
- * - !! multiple vusers can be launched by artillery in the same worker (it was not expected)
- * - we've to change the way the script is running in order to be able tp launch multiple scripts in the same worker
+ * - test-vusers-mainthread.yml: srcipt expected to run in the workers 1 (W0001)
+ *   - learner name: testperfs.learner.1, 2, 3
+ * - test-vusers-workers.yml   : srcipt expected to run in multiple workers
  **************************************************************************************************/
 async function testVUsers(pwPage, userContext) {
-  if (!process.env.SLDX_CPT_RUN) {
-    process.env.SLDX_CPT_RUN = '1'
-  }
-  myConsole.superhighlight(`ARTILLERY RUN testVUsers CPT[${getcpt('SLDX_CPT_RUN')}] username[${userContext.vars.learnername}] password[${userContext.vars.password}]`)
-
-  return new Promise((resolve) => {
-    const cpt = getcpt('SLDX_CPT_RUN')
+  assert(!isMainThread, 'artillery is not supposed to lanch a script in the main thread')
+  myConsole.enableConsole(true)
+  const { learnerName, learnerShortName } = _calculateLearnerInfo()
+  myConsole.superhighlight(`Artillery run testVUsers ${chalk.green(`learnerName[${learnerName}] _learnerCounter[${_learnerCounter}]`)}`)
+  await new Promise((resolve) => {
     setTimeout(() => {
-      myConsole.highlight(`END ${cpt}`)
+      /** _learnerCounter should display the value of the last worker launched by artillery */
+      myConsole.highlight(`END learnerName[${learnerName}] learnerShortName[${learnerShortName}] _learnerCounter[${_learnerCounter}]`)
       resolve()
-    }, 60 * 1000)
+    }, 10 * 1000)
   })
 }
-
-/***************************************************************************************************
- * testWorkers
- * - Test messaging between main process (main thread) and workers through the broadCastChannel
- **************************************************************************************************/
-async function testWorkers() {
-  myConsole.superhighlight(`testWrokers ${myConsole.threadId}`)
-  if (isMainThread) {
-    return
-  }
-  if (!process.env.SLDX_CPT_RUN) {
-    process.env.SLDX_CPT_RUN = '1'
-  }
-  myConsole.superhighlight(`cpt[${getcpt('SLDX_CPT_RUN')}]`)
-  return new Promise((res, rej) => {
-    let cpt = 0
-    let threadNum = parseInt(threadId)
-    /**
-     * broadCastChannel used by scripts to send message and by main thread to receive /Process them
-     * see ScriptMonitoring and ScriptRunner
-     * ScriptMonitoring below create a listener on this channel
-     */
-    const broadCastChannel = new BroadcastChannel(MESSAGE_BROADCAST_CHANNEL);
-    setInterval(async () => {
-      myConsole.lowlight(`${myConsole.threadId} broadCastChannel.postMessage`)
-      broadCastChannel.postMessage({
-        type: MESSAGE_METRICS,
-        id: cpt % 2 == 0 ? METRIC_CARDS : cpt % 3 == 0 ? METRIC_QUIZ : METRIC_NAV,
-        emitter: myConsole.threadId,
-        data: {
-          value: 10,
-          n: 11,
-          min: 12,
-          max: 13,
-          mean: 14,
-          variance: 15,
-          label: `label`
-        }
-      })
-      cpt++
-      if (cpt > 30) {
-        broadCastChannel.postMessage({
-          type: MESSAGE_STATUS,
-          id: cpt % 2 == 0 ? METRIC_CARDS : cpt % 3 == 0 ? METRIC_QUIZ : METRIC_NAV,
-          emitter: myConsole.threadId,
-          data: {
-            value: 10,
-            n: 11,
-            min: 12,
-            max: 13,
-            mean: 14,
-            variance: 15,
-            label: `label`
-          }
-        })
-        res()
-      }
-    }, threadNum * 1000)
-  })
-}
-
